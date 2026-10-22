@@ -403,6 +403,9 @@ impl App {
         if !(manual || (refused && !self.err_retried.contains(&w.id))) {
             return;
         }
+        if std::env::var_os("TG_DEBUG").is_some() {
+            eprintln!("[recover] first attempt failed: {e}");
+        }
         self.err_retried.insert(w.id.clone());
         self.cache.remove(&w.id);
         self.inflight.insert(w.id.clone());

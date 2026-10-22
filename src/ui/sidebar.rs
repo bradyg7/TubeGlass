@@ -421,7 +421,7 @@ impl App {
                 self.music_q.clear();
                 self.music_open_home();
             }
-            if s == Sel::Live && self.live.is_none() {
+            if s == Sel::Live && (self.live.is_none() || now_secs().saturating_sub(self.fcache.live_updated) > 180) && !self.live_loading {
                 self.load_live();
             }
             if let Sel::Channel(cid) = &s {

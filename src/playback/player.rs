@@ -666,7 +666,7 @@ fn spawn_audio_only(streams: &Streams, rate: u32, stop: Arc<AtomicBool>, afx: &s
     let (url, ua) = match (&streams.audio, streams.video.iter().max_by_key(|v| v.height)) {
         (Some(a), _) => (proxy::serve(&a.url, &a.ua, stop)?, a.ua.clone()),
         (None, Some(v)) if crate::platform::is_local_path(&v.url) => (v.url.clone(), v.ua.clone()),
-        (None, Some(v)) if v.hls => (v.audio_url.clone().unwrap_or_else(|| v.url.clone()), v.ua.clone()),
+        (None, Some(v)) if v.hls => (proxy::serve_hls(v.audio_url.as_deref().unwrap_or(&v.url), &v.ua, stop)?, v.ua.clone()),
         (None, Some(v)) => (proxy::serve(&v.url, &v.ua, stop)?, v.ua.clone()),
         _ => return Err("no stream".into()),
     };
@@ -718,7 +718,7 @@ fn spawn(
     let stop = Arc::new(AtomicBool::new(false));
     let seekable = !streams.is_live;
     let via_proxy = |url: &str, ua: &str, hls: bool| -> Result<String, String> {
-        if hls { Ok(url.to_string()) } else { proxy::serve(url, ua, stop.clone()) }
+        if hls { proxy::serve_hls(url, ua, stop.clone()) } else { proxy::serve(url, ua, stop.clone()) }
     };
     let audio_only = force_audio || opt.height == 0;
     // Audio-only: read just the dedicated audio stream when there is one, so the video
@@ -726,14 +726,17 @@ fn spawn(
     let (vurl, vua) = match (&streams.audio, audio_only) {
         (Some(a), true) if !opt.muxed => (via_proxy(&a.url, &a.ua, false)?, a.ua.clone()),
         _ => match (&opt.audio_url, audio_only) {
-            (Some(au), true) => (au.clone(), opt.ua.clone()),
+            (Some(au), true) => (via_proxy(au, &opt.ua, true)?, opt.ua.clone()),
             _ => (via_proxy(&opt.url, &opt.ua, opt.hls)?, opt.ua.clone()),
         },
     };
     let aurl = match (&streams.audio, opt.muxed, audio_only) {
         (Some(a), false, false) => Some(via_proxy(&a.url, &a.ua, false)?),
         // HLS: the variant is video-only and its sound is a separate playlist
-        (None, false, false) => opt.audio_url.clone(),
+        (None, false, false) => match &opt.audio_url {
+            Some(a) => Some(via_proxy(a, &opt.ua, true)?),
+            None => None,
+        },
         _ => None,
     };
 

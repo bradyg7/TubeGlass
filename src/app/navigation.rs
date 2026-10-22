@@ -155,7 +155,7 @@ impl App {
                 }
             }
             Sel::Live => {
-                if self.live.is_none() {
+                if self.live.is_none() || now_secs().saturating_sub(self.fcache.live_updated) > 180 {
                     self.load_live();
                 }
                 self.sel = Sel::Live;

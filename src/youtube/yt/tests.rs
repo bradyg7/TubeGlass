@@ -143,6 +143,47 @@ mod tests {
         }
     }
 
+    /// Live streams currently on air must give a playable stream (a regression canary).
+    #[test]
+    #[ignore = "needs network"]
+    fn live_now_streams_resolve() {
+        let live = live_now().expect("live list");
+        assert!(!live.is_empty(), "no live streams were listed");
+        let mut ok = 0;
+        for v in live.iter().take(40) {
+            match streams(&v.id) {
+                Ok(s) => {
+                    ok += 1;
+                    println!("OK  {} live={} opts={:?} audio={}", v.id, s.is_live, s.video.iter().map(|o| (o.height, o.muxed, o.hls)).collect::<Vec<_>>(), s.audio.is_some());
+                }
+                Err(e) => println!("ERR {} {}: {e}", v.id, v.title.chars().take(40).collect::<String>()),
+            }
+        }
+        assert!(ok > 0, "none of the live streams could be resolved");
+    }
+
+    /// Prints how a named live stream would be opened (debugging aid: TG_LIVE_TITLE=nbc).
+    #[test]
+    #[ignore = "needs network"]
+    fn live_one_debug() {
+        let want = std::env::var("TG_LIVE_TITLE").unwrap_or_else(|_| "NBC News".into()).to_lowercase();
+        let live = live_now().expect("live list");
+        let v = live.iter().find(|v| v.title.to_lowercase().contains(&want)).expect("no such live stream");
+        println!("ID {} {}", v.id, v.title);
+        match streams(&v.id) {
+            Ok(s) => {
+                for o in &s.video {
+                    println!("OPT {}p hls={} muxed={} ua={} url={} audio_url={:?}", o.height, o.hls, o.muxed, o.ua, o.url, o.audio_url);
+                }
+            }
+            Err(e) => println!("ERR {e}"),
+        }
+        match streams_alt(&v.id) {
+            Ok(_) => println!("ALT ok"),
+            Err(e) => println!("ALT ERR {e}"),
+        }
+    }
+
     #[test]
     #[ignore = "needs network"]
     fn live_manifest_debug() {

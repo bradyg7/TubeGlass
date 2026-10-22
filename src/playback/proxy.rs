@@ -373,3 +373,193 @@ mod failure_tests {
         stop.store(true, Ordering::SeqCst);
     }
 }
+
+/// Percent-encodes a whole address so it can travel inside a query.
+fn enc(s: &str) -> String {
+    let mut o = String::new();
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
+            o.push(b as char);
+        } else {
+            o.push_str(&format!("%{b:02X}"));
+        }
+    }
+    o
+}
+
+/// Undoes [`enc`].
+fn dec(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut o = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() && let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+            o.push(v);
+            i += 3;
+        } else {
+            o.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&o).to_string()
+}
+
+/// Resolves a playlist line against the playlist's own address.
+fn join(base: &str, r: &str) -> String {
+    if r.starts_with("http://") || r.starts_with("https://") {
+        return r.to_string();
+    }
+    let scheme_end = base.find("://").map(|i| i + 3).unwrap_or(0);
+    if r.starts_with('/') {
+        let host_end = base[scheme_end..].find('/').map(|i| i + scheme_end).unwrap_or(base.len());
+        return format!("{}{}", &base[..host_end], r);
+    }
+    let path = base.split(['?', '#']).next().unwrap_or(base);
+    let dir = path.rfind('/').filter(|i| *i >= scheme_end).map(|i| &path[..=i]).unwrap_or(path);
+    format!("{dir}{r}")
+}
+
+/// The local address that stands for an upstream one. It keeps the file name so ffmpeg's
+/// HLS reader still recognises segments by their extension.
+fn local(port: u16, upstream: &str) -> String {
+    let name = upstream.split(['?', '#']).next().unwrap_or("").rsplit('/').next().unwrap_or("x");
+    format!("http://127.0.0.1:{port}/h/{}?u={}", if name.is_empty() { "x" } else { name }, enc(upstream))
+}
+
+/// Rewrites every address in an HLS playlist to go through the proxy.
+fn rewrite_playlist(text: &str, base: &str, port: u16) -> String {
+    let mut out = String::with_capacity(text.len() + 1024);
+    for line in text.lines() {
+        if line.starts_with('#') {
+            // addresses inside tags: URI="..."
+            let mut rest = line;
+            while let Some(i) = rest.find("URI=\"") {
+                out.push_str(&rest[..i + 5]);
+                rest = &rest[i + 5..];
+                let end = rest.find('"').unwrap_or(rest.len());
+                out.push_str(&local(port, &join(base, &rest[..end])));
+                rest = &rest[end..];
+            }
+            out.push_str(rest);
+        } else if line.trim().is_empty() {
+            out.push_str(line);
+        } else {
+            out.push_str(&local(port, &join(base, line.trim())));
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// Answers one request of the HLS proxy: playlists are rewritten, everything else is passed on.
+fn handle_hls(mut sock: TcpStream, port: u16, ua: &str, stop: &AtomicBool) -> std::io::Result<()> {
+    let mut buf = vec![];
+    let mut tmp = [0u8; 1024];
+    while !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+        let n = sock.read(&mut tmp)?;
+        if n == 0 || buf.len() > 16384 {
+            return Ok(());
+        }
+        buf.extend_from_slice(&tmp[..n]);
+    }
+    let head = String::from_utf8_lossy(&buf).to_string();
+    let target = head.lines().next().unwrap_or("").split(' ').nth(1).unwrap_or("");
+    let Some(url) = target.split_once("?u=").map(|(_, u)| dec(u)) else {
+        return sock.write_all(b"HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    };
+    let mut last = String::new();
+    let mut resp = None;
+    for attempt in 0..3 {
+        match shared_agent().get(&url).header("User-Agent", ua).call() {
+            Ok(r) => {
+                resp = Some(r);
+                break;
+            }
+            Err(ureq::Error::StatusCode(code)) => {
+                last = format!("YouTube refused the stream (HTTP {code})");
+                if code == 403 || code == 404 || code == 410 {
+                    break;
+                }
+            }
+            Err(e) => last = e.to_string(),
+        }
+        std::thread::sleep(Duration::from_millis(250 * (attempt + 1)));
+    }
+    let Some(r) = resp else {
+        if let Ok(mut g) = LAST_ERROR.lock() {
+            *g = last.clone();
+        }
+        let _ = sock.write_all(b"HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+        return Err(std::io::Error::other(last));
+    };
+    let mut body = r.into_body();
+    let mut rd = body.as_reader();
+    let mut first = vec![0u8; 64 * 1024];
+    let n = rd.read(&mut first)?;
+    first.truncate(n);
+    if first.starts_with(b"#EXTM3U") {
+        let mut all = first;
+        rd.read_to_end(&mut all)?;
+        let text = rewrite_playlist(&String::from_utf8_lossy(&all), &url, port);
+        let h = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.apple.mpegurl\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            text.len()
+        );
+        sock.write_all(h.as_bytes())?;
+        return sock.write_all(text.as_bytes());
+    }
+    sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n")?;
+    sock.write_all(&first)?;
+    let mut data = vec![0u8; 64 * 1024];
+    while !stop.load(Ordering::Relaxed) {
+        let n = rd.read(&mut data)?;
+        if n == 0 {
+            break;
+        }
+        sock.write_all(&data[..n])?;
+    }
+    Ok(())
+}
+
+/// Starts a proxy for a live (HLS) playlist; returns the local address ffmpeg should open.
+/// ffmpeg never talks to YouTube itself, so it needs no name lookup or TLS of its own.
+pub fn serve_hls(url: &str, ua: &str, stop: Arc<AtomicBool>) -> Result<String, String> {
+    let l = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    l.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let port = l.local_addr().map_err(|e| e.to_string())?.port();
+    let ua = ua.to_string();
+    std::thread::spawn(move || {
+        while !stop.load(Ordering::Relaxed) {
+            match l.accept() {
+                Ok((s, _)) => {
+                    let _ = s.set_nonblocking(false);
+                    let (a, st) = (ua.clone(), stop.clone());
+                    std::thread::spawn(move || {
+                        if let Err(e) = handle_hls(s, port, &a, &st) {
+                            eprintln!("proxy: {e}");
+                        }
+                    });
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(40)),
+            }
+        }
+    });
+    Ok(local(port, url))
+}
+
+#[cfg(test)]
+mod hls_tests {
+    use super::*;
+
+    #[test]
+    fn playlist_addresses_go_through_the_proxy() {
+        let base = "https://h.example/a/b/index.m3u8?x=1";
+        assert_eq!(join(base, "seg.ts"), "https://h.example/a/b/seg.ts");
+        assert_eq!(join(base, "/z/s.ts"), "https://h.example/z/s.ts");
+        assert_eq!(join(base, "https://o/s.ts"), "https://o/s.ts");
+        let out = rewrite_playlist("#EXTM3U\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:5,\nseg.ts?q=1\n", base, 9);
+        assert!(out.contains("http://127.0.0.1:9/h/init.mp4?u=https%3A%2F%2Fh.example%2Fa%2Fb%2Finit.mp4"));
+        assert!(out.contains("http://127.0.0.1:9/h/seg.ts?u="));
+        assert_eq!(dec(&enc("https://a/b?c=d&e")), "https://a/b?c=d&e");
+    }
+}
