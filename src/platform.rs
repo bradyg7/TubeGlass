@@ -243,7 +243,10 @@ pub fn local_day_key(t: u64) -> String {
 /// Restarts the app: starts a new copy and ends this one without saving over fresh data.
 pub fn restart() -> ! {
     // an AppImage runs from a temporary mount that disappears with it: start the file itself
-    let exe = std::env::var_os("APPIMAGE").map(std::path::PathBuf::from).or_else(|| std::env::current_exe().ok());
+    let exe = std::env::var_os("APPIMAGE").map(std::path::PathBuf::from).or_else(|| {
+        // after the file was replaced Linux reports the old path as "<path> (deleted)"
+        std::env::current_exe().ok().map(|p| std::path::PathBuf::from(p.to_string_lossy().trim_end_matches(" (deleted)")))
+    });
     if let Some(exe) = exe {
         let _ = Command::new(exe).spawn();
     }

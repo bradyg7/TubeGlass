@@ -117,6 +117,11 @@ impl App {
                     }
                     Err(e) => self.update_state = UpdateState::Failed(e),
                 },
+                // a tarball install updates itself when its folder is writable
+                Install::LinuxOther if update::install_tarball(&path).is_ok() => {
+                    let _ = std::fs::remove_file(&path);
+                    self.update_state = UpdateState::Done(path, true);
+                }
                 // a .deb opens in the software installer; archives open in the file manager
                 _ => {
                     crate::platform::open_path(&path);

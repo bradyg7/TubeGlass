@@ -230,6 +230,39 @@ pub fn replace_appimage(new_file: &std::path::Path) -> Result<PathBuf, String> {
     Ok(current)
 }
 
+/// Installs a downloaded Linux tarball over the running program (when its folder can be written):
+/// unpacks it and swaps in the new `tubeglass`. Returns the program's path.
+pub fn install_tarball(archive: &std::path::Path) -> Result<PathBuf, String> {
+    let current = std::env::current_exe().map_err(|e| e.to_string())?;
+    let work = std::env::temp_dir().join(format!("tubeglass-update-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&work);
+    std::fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    let run = || -> Result<(), String> {
+        let st = crate::platform::command("tar").arg("-xzf").arg(archive).arg("-C").arg(&work).status().map_err(|e| format!("cannot run tar: {e}"))?;
+        if !st.success() {
+            return Err("the downloaded archive could not be unpacked".into());
+        }
+        let new = std::fs::read_dir(&work)
+            .map_err(|e| e.to_string())?
+            .flatten()
+            .map(|d| d.path().join("tubeglass"))
+            .find(|p| p.is_file())
+            .ok_or("the archive holds no program")?;
+        let staging = current.with_extension("new");
+        std::fs::copy(&new, &staging).map_err(|e| format!("cannot write next to the program: {e}"))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&staging, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+        }
+        // a running file can be replaced on Linux: the old copy lives on until the app exits
+        std::fs::rename(&staging, &current).map_err(|e| e.to_string())
+    };
+    let r = run();
+    let _ = std::fs::remove_dir_all(&work);
+    r.map(|_| current)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
