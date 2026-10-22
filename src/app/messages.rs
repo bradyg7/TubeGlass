@@ -264,7 +264,13 @@ impl App {
                     }
                 }
                 Msg::UpdateDownloaded(r) => self.finish_update(r),
-                Msg::FfmpegChecked(ok) => self.ffmpeg_missing = !ok,
+                Msg::FfmpegChecked(ok) => self.ffmpeg_checked(ok),
+                Msg::FfmpegProgress(p) => {
+                    if matches!(self.ffmpeg, FfmpegState::Downloading(_)) {
+                        self.ffmpeg = FfmpegState::Downloading(p);
+                    }
+                }
+                Msg::FfmpegInstalled(r) => self.ffmpeg_installed(r),
                 Msg::Online(up) => {
                     let was = self.online;
                     self.online = up;
@@ -276,6 +282,9 @@ impl App {
                         }
                     } else if !was && up {
                         self.toast("Back online");
+                        if matches!(self.ffmpeg, FfmpegState::Failed(_)) && ffmpeg_setup::source_for_this_system().is_some() {
+                            self.start_ffmpeg_setup();
+                        }
                         self.refresh_all();
                     }
                 }

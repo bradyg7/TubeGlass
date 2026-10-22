@@ -1,14 +1,89 @@
 //! Everything that differs between operating systems lives here, so the rest of the app can
 //! stay the same on Linux, macOS and Windows.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
 
-/// A command for a helper program (ffmpeg, ffprobe). On Windows the console window that would
-/// otherwise flash up for every process is suppressed.
+/// File name of the ffmpeg program on this system.
+pub fn ffmpeg_file_name() -> &'static str {
+    if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" }
+}
+
+/// Where a copy of ffmpeg that TubeGlass downloaded itself is kept.
+pub fn managed_ffmpeg_dir() -> PathBuf {
+    dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("tubeglass").join("ffmpeg")
+}
+
+/// Every place ffmpeg may live, best first:
+///  1. `TUBEGLASS_FFMPEG`, if set (an explicit choice always wins)
+///  2. the copy shipped with the release package, next to the program
+///     (`ffmpeg`, `../lib/tubeglass/ffmpeg` for the Linux tarball, `../Resources/ffmpeg` in a macOS app)
+///  3. the copy TubeGlass downloaded on first run
+fn ffmpeg_candidates() -> Vec<PathBuf> {
+    let mut v = vec![];
+    if let Some(p) = std::env::var_os("TUBEGLASS_FFMPEG") {
+        v.push(PathBuf::from(p));
+    }
+    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(|p| p.to_path_buf())) {
+        v.push(dir.join(ffmpeg_file_name()));
+        v.push(dir.join("../lib/tubeglass").join(ffmpeg_file_name()));
+        v.push(dir.join("../Resources").join(ffmpeg_file_name()));
+    }
+    v.push(managed_ffmpeg_dir().join(ffmpeg_file_name()));
+    v
+}
+
+static FFMPEG: RwLock<Option<Option<PathBuf>>> = RwLock::new(None);
+/// Copies that exist but would not start (so they are not chosen again).
+static REJECTED: RwLock<Vec<PathBuf>> = RwLock::new(Vec::new());
+
+/// The ffmpeg to run: a bundled or downloaded copy when there is one, otherwise plain `ffmpeg`
+/// from `PATH`.
+pub fn ffmpeg_program() -> PathBuf {
+    if let Some(found) = FFMPEG.read().ok().and_then(|g| g.clone()) {
+        return found.unwrap_or_else(|| PathBuf::from("ffmpeg"));
+    }
+    let rejected = REJECTED.read().map(|r| r.clone()).unwrap_or_default();
+    let found = ffmpeg_candidates().into_iter().find(|p| p.is_file() && !rejected.contains(p));
+    if let Ok(mut g) = FFMPEG.write() {
+        *g = Some(found.clone());
+    }
+    found.unwrap_or_else(|| PathBuf::from("ffmpeg"))
+}
+
+/// Stops using the ffmpeg that is currently chosen (it exists but does not run) so the next
+/// choice, e.g. a freshly downloaded copy, takes over. Returns true when there was a copy to drop.
+pub fn reject_ffmpeg() -> bool {
+    let p = ffmpeg_program();
+    if !p.is_absolute() || p.starts_with(managed_ffmpeg_dir()) {
+        return false;
+    }
+    if let Ok(mut r) = REJECTED.write() {
+        r.push(p);
+    }
+    refresh_ffmpeg();
+    true
+}
+
+/// Looks for ffmpeg again (after a download).
+pub fn refresh_ffmpeg() {
+    if let Ok(mut g) = FFMPEG.write() {
+        *g = None;
+    }
+}
+
+/// A short description of which ffmpeg is in use, for the settings page.
+pub fn ffmpeg_in_use() -> String {
+    let p = ffmpeg_program();
+    if p.is_absolute() { p.display().to_string() } else { "ffmpeg from PATH".to_string() }
+}
+
+/// A command for a helper program (ffmpeg). On Windows the console window that would otherwise
+/// flash up for every process is suppressed.
 pub fn command(program: &str) -> Command {
     #[allow(unused_mut)]
-    let mut c = Command::new(program);
+    let mut c = Command::new(if program == "ffmpeg" { ffmpeg_program() } else { PathBuf::from(program) });
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

@@ -51,7 +51,7 @@ pub(crate) struct App {
     pub(crate) update_checking: bool,
     pub(crate) update_note: Option<String>,
     /// ffmpeg was not found at launch (playback and downloads cannot work without it)
-    pub(crate) ffmpeg_missing: bool,
+    pub(crate) ffmpeg: FfmpegState,
     pub(crate) ffmpeg_hidden: bool,
     pub(crate) update_notes_open: bool,
     pub(crate) online_known: bool,
@@ -186,5 +186,16 @@ pub(crate) enum UpdateState {
     Downloading(f32),
     /// finished: the file was saved here (and installed, for an AppImage)
     Done(std::path::PathBuf, bool),
+    Failed(String),
+}
+
+/// Whether ffmpeg, which everything runs through, is ready.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum FfmpegState {
+    /// found (bundled, downloaded earlier, or on the PATH), or the check is still running
+    Ready,
+    /// being downloaded (0–1)
+    Downloading(f32),
+    /// could not be found or downloaded
     Failed(String),
 }

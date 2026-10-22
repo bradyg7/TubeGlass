@@ -16,7 +16,7 @@
 TubeGlass is what [NewPipe](https://github.com/TeamNewPipe/NewPipe) is on Android, for the desktop:
 follow the channels you like, watch and listen without an account, save things for offline use, and
 keep everything on your own computer. It is written in Rust with [egui](https://github.com/emilk/egui),
-decodes with [ffmpeg](https://ffmpeg.org) and gets its data the way NewPipe does — by reading
+decodes with [ffmpeg](https://ffmpeg.org) (included — nothing else to install) and gets its data the way NewPipe does — by reading
 YouTube's public pages and internal endpoints, so there is no API key to register and no quota.
 
 > TubeGlass is an independent project. It is not affiliated with or endorsed by YouTube or Google.
@@ -118,7 +118,7 @@ Download the file for your system from the **[latest release](https://github.com
 | System | File | How to install |
 | --- | --- | --- |
 | Any Linux | `TubeGlass-<version>-linux-<arch>.AppImage` | `chmod +x TubeGlass-*.AppImage && ./TubeGlass-*.AppImage` — it can update itself |
-| Debian, Ubuntu, Mint … | `tubeglass_<version>_<amd64\|arm64>.deb` | `sudo apt install ./tubeglass_*.deb` (also installs ffmpeg) |
+| Debian, Ubuntu, Mint … | `tubeglass_<version>_<amd64\|arm64>.deb` | `sudo apt install ./tubeglass_*.deb` (pulls in ffmpeg) |
 | Other Linux | `TubeGlass-<version>-linux-<arch>.tar.gz` | unpack, then run `./install.sh` (installs for your user, no root) |
 | Arch Linux | `packaging/PKGBUILD` | `cd packaging && makepkg -si` |
 | Windows 10 / 11 | `TubeGlass-<version>-windows-x86_64.zip` | unzip anywhere and run `TubeGlass.exe` |
@@ -133,25 +133,28 @@ On Windows, if SmartScreen warns you, choose *More info → Run anyway*.
 
 ### Do I need to install ffmpeg?
 
-**Yes — everyone does, including people who install a ready-made release.** TubeGlass hands all
-decoding (video, audio), downloading, clipping and file probing to the `ffmpeg` and `ffprobe`
-programs; they are not bundled in the release files. This is a one-time step per computer:
+**No.** TubeGlass uses [ffmpeg](https://ffmpeg.org) for all decoding, downloading and clipping, and it
+takes care of having one:
 
-| System | Command |
+| How you got TubeGlass | Where ffmpeg comes from |
 | --- | --- |
-| Debian / Ubuntu | `sudo apt install ffmpeg` *(already done for you by the `.deb`)* |
-| Fedora | `sudo dnf install ffmpeg` (enable [RPM Fusion](https://rpmfusion.org) first) |
-| Arch | `sudo pacman -S ffmpeg` |
-| macOS | `brew install ffmpeg` |
-| Windows | `winget install ffmpeg` (or download a build from <https://ffmpeg.org/download.html> and add it to `PATH`) |
+| AppImage, Linux tarball, Windows zip, macOS app | **Included in the package** — it works offline straight after installing |
+| `.deb` | Installed by `apt` as a dependency of the package |
+| Built from source (`cargo run`), or any other install without ffmpeg | **Downloaded automatically the first time the app starts** (about 30 MB, once, with a progress bar at the top of the window). It is checked against a pinned SHA-256 checksum and stored in TubeGlass's own data folder, so nothing is installed system-wide |
 
-If ffmpeg is missing, TubeGlass tells you straight away with a bar at the top of the window that
-shows the command for your system — nothing fails silently. Restart the app after installing it.
-*Why not bundle it?* ffmpeg builds are large and carry their own licences (GPL for the full builds);
-using the copy you already have keeps the downloads small and lets you update ffmpeg independently.
+TubeGlass looks for ffmpeg in this order: the `TUBEGLASS_FFMPEG` environment variable → the copy
+that came with the package (next to the program) → the copy it downloaded earlier → `ffmpeg` on your
+`PATH`. **Settings → Data → ffmpeg** shows which one is in use and can download a fresh copy.
 
-**Building from source needs ffmpeg too** (see below) — the only extra requirement a source build has
-is the Rust toolchain and a few development libraries.
+If the automatic download cannot work (no internet on first run, or a system with no ready-made
+build), a red bar explains and offers *Try again*; it retries by itself when you are back online.
+You can always install ffmpeg yourself instead (`sudo apt install ffmpeg`, `brew install ffmpeg`,
+`winget install ffmpeg`).
+
+The bundled builds are static **GPL v3** builds of FFmpeg, run as a separate program (TubeGlass itself
+stays MIT). Their licence, where they come from and how to get their source are in
+[`packaging/THIRD_PARTY_NOTICES.md`](packaging/THIRD_PARTY_NOTICES.md), and the exact files and
+checksums are pinned in [`packaging/ffmpeg-sources.tsv`](packaging/ffmpeg-sources.tsv).
 
 ### Platform status
 
@@ -160,6 +163,7 @@ is the Rust toolchain and a few development libraries.
 | Builds and passes the tests in CI | ✅ | ✅ | ✅ |
 | Packaged by the release workflow | ✅ x86_64, aarch64 | ✅ Apple silicon, Intel | ✅ x86_64 |
 | Playback, downloads, podcasts, clips | ✅ | ✅ | ✅ |
+| ffmpeg included | ✅ (not in the `.deb`: `apt` installs it) | ✅ | ✅ |
 | Media keys / "now playing" widget | ✅ MPRIS | — | — |
 | Desktop notifications | ✅ | ✅ | — |
 | Double-click / "Open with" a file | ✅ | — *(use Open file…)* | — *(use Open file…)* |
@@ -238,21 +242,23 @@ GitHub for the update check. No analytics, no accounts, no telemetry.
 
 ### 1. Prerequisites
 
-You need a [Rust toolchain](https://rustup.rs) (stable, 2024 edition — Rust 1.87 or newer),
-**ffmpeg**, and a few development libraries.
+You need a [Rust toolchain](https://rustup.rs) (stable, 2024 edition — Rust 1.87 or newer) and a
+few development libraries. **You do not need to install ffmpeg**: the first time the app starts it
+downloads its own (see [above](#do-i-need-to-install-ffmpeg)). Installing ffmpeg yourself is optional
+and is used instead when it is on your `PATH`.
 
 <details open>
 <summary><b>Linux</b></summary>
 
 ```bash
 # Debian / Ubuntu
-sudo apt install build-essential pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev ffmpeg
+sudo apt install build-essential pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev
 
 # Fedora
-sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel libxkbcommon-devel wayland-devel libX11-devel ffmpeg
+sudo dnf install gcc pkgconf-pkg-config alsa-lib-devel libxkbcommon-devel wayland-devel libX11-devel
 
 # Arch
-sudo pacman -S --needed base-devel alsa-lib libxkbcommon wayland libx11 ffmpeg
+sudo pacman -S --needed base-devel alsa-lib libxkbcommon wayland libx11
 ```
 </details>
 
@@ -261,7 +267,6 @@ sudo pacman -S --needed base-devel alsa-lib libxkbcommon wayland libx11 ffmpeg
 
 ```bash
 xcode-select --install          # compiler and SDK
-brew install ffmpeg
 ```
 </details>
 
@@ -269,11 +274,7 @@ brew install ffmpeg
 <summary><b>Windows</b></summary>
 
 Install the [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) with the
-*Desktop development with C++* workload, then:
-
-```powershell
-winget install ffmpeg
-```
+*Desktop development with C++* workload. That is all.
 </details>
 
 ### 2. Get the code and run it
@@ -281,7 +282,8 @@ winget install ffmpeg
 ```bash
 git clone https://github.com/flawlesscode254/TubeGlass.git
 cd TubeGlass
-cargo run --release            # build and start (the first build takes a few minutes)
+cargo run --release            # build and start (the first build takes a few minutes;
+                               # on first start the app fetches its own ffmpeg)
 ```
 
 `--release` matters: debug builds decode video far too slowly to play smoothly.
@@ -298,7 +300,7 @@ To install it for your user on Linux, with a menu entry and "Open with" support:
 
 ```bash
 cargo test --release                    # fast unit tests (parsers, update logic, backups …)
-cargo test --release -- --ignored       # also the live tests; need internet access and ffmpeg
+cargo test --release -- --ignored       # also the live tests; need internet access (they download ffmpeg too)
 ```
 
 The live tests talk to YouTube, so they are marked `#[ignore]` and run daily in the *YouTube canary*
@@ -307,7 +309,8 @@ workflow — a failure there means YouTube changed something and the extractor n
 ### 4. Build the release packages
 
 All scripts take their version from `Cargo.toml` and write to `dist/`. Set `SKIP_BUILD=1` to package
-a binary you already built.
+a binary you already built, and `SKIP_FFMPEG=1` to leave the bundled ffmpeg out (the downloads are
+checked against `packaging/ffmpeg-sources.tsv`; `packaging/fetch-ffmpeg.sh <platform> <folder>` fetches one by hand).
 
 | Package | Run it on | Command |
 | --- | --- | --- |
@@ -321,6 +324,7 @@ a binary you already built.
 
 | Variable | Effect |
 | --- | --- |
+| `TUBEGLASS_FFMPEG=<path>` | Use this ffmpeg instead of the bundled, downloaded or system one |
 | `TG_DEBUG=1` | Print player timings, state changes and gapless hand-overs to stderr |
 | `TUBEGLASS_UPDATE_API=<url>` | Point the update checker at another "latest release" JSON (for testing the update flow) |
 
@@ -351,7 +355,7 @@ Every source file starts with a `//!` description and every function has a doc c
 
 | Problem | What to do |
 | --- | --- |
-| A red bar says **ffmpeg was not found** | Install ffmpeg ([commands above](#do-i-need-to-install-ffmpeg)) and restart TubeGlass. |
+| A red bar says **ffmpeg is not available** | The automatic download failed (offline, or a blocked connection). Press *Try again*, or install ffmpeg yourself (`apt` / `brew` / `winget`) and restart TubeGlass. |
 | **"Can't play this video"** | TubeGlass retries once with other YouTube clients by itself; press *Try again*. If a video keeps failing, run **Settings → Check YouTube access** to see which part broke. YouTube changes things now and then — check for an update. |
 | No sound | Check the system's default output device; TubeGlass plays through it. On Linux the user must be able to open the ALSA / PipeWire device. |
 | Video stutters | Use a release build (`cargo run --release`), or lower the quality in the player. |
@@ -366,7 +370,7 @@ Every source file starts with a `//!` description and every function has a doc c
   clients in turn (the primary one is verified to hand out unciphered links, the others are fallbacks
   that are tested before use). Channel, search and comment data are read from the same JSON the web
   pages use. Everything has a plain-text error path so a failure says what went wrong.
-- **Playback.** YouTube only serves bounded ranges, so ffmpeg reads through a tiny loopback
+- **Playback.** YouTube only serves bounded ranges, so the bundled ffmpeg reads through a tiny loopback
   **range proxy** that fetches the file in chunks. ffmpeg writes raw RGBA pictures and PCM sound; the
   sound goes to the sound card with [cpal](https://github.com/RustAudio/cpal) and its sample counter
   is the **master clock** that pictures are paced against, so sound and picture stay together through

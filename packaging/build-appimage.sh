@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Assembles an AppDir and, when `appimagetool` is available, packs it into
 # dist/TubeGlass-<version>-linux-<arch>.AppImage.
-# (ffmpeg is expected on the host; bundling it is left to the packager.)
 #   ./packaging/build-appimage.sh
+# ffmpeg is bundled (fetched and checked by fetch-ffmpeg.sh); set SKIP_FFMPEG=1 to leave it out.
 # Set SKIP_BUILD=1 to package an already built target/release/tubeglass.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -19,6 +19,11 @@ install -Dm644 packaging/tubeglass.svg "$APPDIR/tubeglass.svg"
 install -Dm644 packaging/tubeglass.png "$APPDIR/tubeglass.png"
 install -Dm644 packaging/tubeglass.svg "$APPDIR/usr/share/icons/hicolor/scalable/apps/tubeglass.svg"
 ln -sf tubeglass.png "$APPDIR/.DirIcon"
+if [[ -z "${SKIP_FFMPEG:-}" ]]; then
+  case "$ARCH" in x86_64) FF=linux-x64 ;; aarch64) FF=linux-arm64 ;; *) echo "no bundled ffmpeg for $ARCH"; FF= ;; esac
+  [[ -z "$FF" ]] || ./packaging/fetch-ffmpeg.sh "$FF" "$APPDIR/usr/bin"
+fi
+cp packaging/THIRD_PARTY_NOTICES.md packaging/ffmpeg-LICENSE-GPLv3.txt LICENSE "$APPDIR/usr/share/" 2>/dev/null || true
 cat > "$APPDIR/AppRun" <<'RUN'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"

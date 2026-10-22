@@ -321,6 +321,19 @@ impl App {
                         check_update = true;
                     }
                 });
+                let ff = crate::platform::ffmpeg_in_use();
+                let ffm = &mut self.ffmpeg;
+                let mut redo = false;
+                row(ui, "ffmpeg", &format!("Everything plays through it. In use: {ff}"), &mut |ui| {
+                    if matches!(ffm, FfmpegState::Downloading(_)) {
+                        ui.add(egui::Spinner::new().size(16.0).color(accent()));
+                    } else if ui.button("Download a fresh copy").clicked() {
+                        redo = true;
+                    }
+                });
+                if redo {
+                    self.start_ffmpeg_setup();
+                }
                 row(ui, "Check YouTube access", "Tests search, playback, comments and music, to see what broke if something stops working", &mut |ui| {
                     if self.diag_running {
                         ui.add(egui::Spinner::new().size(16.0).color(accent()));

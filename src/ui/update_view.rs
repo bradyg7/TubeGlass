@@ -4,34 +4,54 @@ use crate::*;
 use crate::update;
 
 impl App {
-    /// A bar that explains how to install ffmpeg when it was not found at launch.
+    /// The bar about ffmpeg: setting it up (with progress) when it was missing at launch, or
+    /// explaining how to install it when the download did not work.
     pub(crate) fn ffmpeg_bar(&mut self, ui: &mut egui::Ui) {
-        if !self.ffmpeg_missing || self.ffmpeg_hidden {
+        let state = self.ffmpeg.clone();
+        if state == FfmpegState::Ready || (matches!(state, FfmpegState::Failed(_)) && self.ffmpeg_hidden) {
             return;
         }
-        let (mut open, mut hide) = (false, false);
+        let (mut retry, mut open, mut hide) = (false, false, false);
+        let fill = match state {
+            FfmpegState::Failed(_) => LIVE.gamma_multiply(0.28),
+            _ => accent().gamma_multiply(0.22),
+        };
         egui::Panel::top("ffmpeg-bar")
             .exact_size(44.0)
             .resizable(false)
-            .frame(egui::Frame::new().fill(LIVE.gamma_multiply(0.28)).inner_margin(egui::Margin::symmetric(24, 6)))
+            .frame(egui::Frame::new().fill(fill).inner_margin(egui::Margin::symmetric(24, 6)))
             .show(ui, |ui| {
-                ui.horizontal_centered(|ui| {
-                    ui.label(egui::RichText::new("ffmpeg was not found, so nothing can play yet.").strong().size(14.0));
-                    // the advice gives way (with an ellipsis) so the buttons always stay visible
-                    let room = (ui.available_width() - 210.0).max(80.0);
-                    ui.allocate_ui(vec2(room, 24.0), |ui| {
-                        ui.add(egui::Label::new(egui::RichText::new(crate::platform::ffmpeg_hint()).size(13.0).color(muted())).truncate());
-                    });
-                    if icon_btn(ui, "", "Download ffmpeg", None, ink(), false, true).clicked() {
-                        open = true;
+                ui.horizontal_centered(|ui| match &state {
+                    FfmpegState::Downloading(p) => {
+                        ui.label(egui::RichText::new("Setting up ffmpeg (once, about 30 MB) so video and audio can play…").strong().size(14.0));
+                        progress_pill(ui, *p, &format!("{}%", (p * 100.0) as u32), 180.0);
                     }
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if icon_btn(ui, "close", "", None, ink(), false, true).on_hover_text("Hide").clicked() {
-                            hide = true;
+                    FfmpegState::Failed(e) => {
+                        ui.label(egui::RichText::new("ffmpeg is not available, so nothing can play yet.").strong().size(14.0));
+                        // the explanation gives way (with an ellipsis) so the buttons always stay visible
+                        let room = (ui.available_width() - 330.0).max(80.0);
+                        let msg = format!("{e}  {}", crate::platform::ffmpeg_hint());
+                        ui.allocate_ui(vec2(room, 24.0), |ui| {
+                            ui.add(egui::Label::new(egui::RichText::new(msg).size(13.0).color(muted())).truncate());
+                        });
+                        if icon_btn(ui, "refresh", "Try again", Some(accent()), ON_ACCENT, false, true).clicked() {
+                            retry = true;
                         }
-                    });
+                        if icon_btn(ui, "", "Get ffmpeg", None, ink(), false, true).clicked() {
+                            open = true;
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if icon_btn(ui, "close", "", None, ink(), false, true).on_hover_text("Hide").clicked() {
+                                hide = true;
+                            }
+                        });
+                    }
+                    FfmpegState::Ready => {}
                 });
             });
+        if retry {
+            self.start_ffmpeg_setup();
+        }
         if open {
             crate::platform::open_url("https://ffmpeg.org/download.html");
         }

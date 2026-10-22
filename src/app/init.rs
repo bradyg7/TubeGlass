@@ -61,7 +61,7 @@ impl App {
             update_next_check: Instant::now() + Duration::from_secs(20),
             update_checking: false,
             update_note: None,
-            ffmpeg_missing: false,
+            ffmpeg: FfmpegState::Ready,
             ffmpeg_hidden: false,
             update_notes_open: false,
             online_known: false,

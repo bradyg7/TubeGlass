@@ -2,6 +2,7 @@
 # Builds TubeGlass.app and dist/TubeGlass-<version>-macos-<arch>.dmg (run on macOS).
 #   ./packaging/build-macos.sh                 build for this Mac
 #   ./packaging/build-macos.sh x86_64          build for Intel Macs (cross-compiles on Apple silicon)
+# ffmpeg is bundled inside the app; set SKIP_FFMPEG=1 to leave it out.
 # Set SKIP_BUILD=1 to package an already built binary.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,6 +21,11 @@ rm -rf "$APP" dist/dmgroot
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 install -m755 "target/$TARGET/release/tubeglass" "$APP/Contents/MacOS/tubeglass"
 install -m644 packaging/macos/tubeglass.icns "$APP/Contents/Resources/tubeglass.icns"
+if [[ -z "${SKIP_FFMPEG:-}" ]]; then
+  case "$ARCH" in aarch64) FF=darwin-arm64 ;; *) FF=darwin-x64 ;; esac
+  ./packaging/fetch-ffmpeg.sh "$FF" "$APP/Contents/Resources"
+fi
+cp LICENSE "$APP/Contents/Resources/" 2>/dev/null || true
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

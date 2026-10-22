@@ -40,9 +40,16 @@ jobs:
         shell: bash
         run: cargo test --release --locked 2>&1 | tee test.log
 
+      # downloads the pinned ffmpeg for this system, checks its checksum, unpacks it and runs
+      # it: proves the build list and the binary work on a real Windows / macOS / Linux machine
+      - name: Download and run the bundled ffmpeg
+        shell: bash
+        run: cargo test --release --locked installs_a_working_ffmpeg -- --ignored --nocapture 2>&1 | tee ffmpeg.log
+
       - name: Show what failed
         if: failure()
         shell: bash
         run: |
           .github/scripts/annotate.sh "${{ matrix.name }} build" build.log
           .github/scripts/annotate.sh "${{ matrix.name }} tests" test.log
+          .github/scripts/annotate.sh "${{ matrix.name }} ffmpeg download" ffmpeg.log

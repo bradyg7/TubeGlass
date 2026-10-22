@@ -203,6 +203,8 @@ pub(crate) enum Msg {
     Online(bool),
     /// Whether ffmpeg could be started at launch.
     FfmpegChecked(bool),
+    FfmpegProgress(f32),
+    FfmpegInstalled(Result<std::path::PathBuf, String>),
     /// Result of looking for a newer release (`true` = the user asked for it).
     UpdateChecked(Result<Option<update::Release>, String>, bool),
     UpdateProgress(f32),
