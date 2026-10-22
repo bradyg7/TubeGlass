@@ -1,0 +1,13 @@
+# build output
+/target
+/dist
+
+# editor and OS files
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# local state (never commit personal data)
+*.log
+/tubeglass-backup*.json
