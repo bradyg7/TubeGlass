@@ -1,0 +1,22 @@
+# Maintainer: TubeGlass
+pkgname=tubeglass
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='YouTube client and media player (no account or API key needed)'
+arch=('x86_64' 'aarch64')
+license=('MIT')
+depends=('ffmpeg' 'alsa-lib' 'libxkbcommon' 'mesa' 'xdg-desktop-portal')
+makedepends=('cargo')
+source=()
+
+build() {
+  cd "$startdir/.."
+  cargo build --release --locked
+}
+
+package() {
+  cd "$startdir/.."
+  install -Dm755 target/release/tubeglass "$pkgdir/usr/bin/tubeglass"
+  install -Dm644 packaging/tubeglass.desktop "$pkgdir/usr/share/applications/tubeglass.desktop"
+  install -Dm644 packaging/tubeglass.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/tubeglass.svg"
+}
