@@ -137,6 +137,7 @@ impl App {
             batch_total: 0,
             last_dir: None,
             viz_levels: vec![0.0; 64],
+            panics: 0,
             lists: load_lists(),
             new_list: None,
             jobs: vec![],

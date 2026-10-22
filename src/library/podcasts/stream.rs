@@ -31,18 +31,53 @@ pub(crate) fn probe_duration(url: &str) -> f64 {
 /// Podcast links usually hop through two or three trackers before the file. Follow them once
 /// and learn the file's size, so playback can then talk to the final address directly.
 pub(crate) fn resolve(url: &str) -> Option<(String, u64)> {
-    use ureq::ResponseExt;
-    let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(15))).build().into();
-    let r = agent.get(url).header("User-Agent", UA).header("Range", "bytes=0-0").call().ok()?;
-    let fin = r.get_uri().to_string();
-    let h = |n: &str| r.headers().get(n).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
-    let len = match h("content-range") {
-        Some(cr) => cr.rsplit('/').next()?.parse().ok()?,
-        // the server ignored the range: only trust it when it says how long the whole file is
-        None if r.status() == 200 => h("content-length")?.parse().ok()?,
-        None => return None,
-    };
-    (len > 1000).then_some((fin, len))
+    // redirects are followed by hand: some tracker hops send a broken body that would otherwise
+    // fail the whole lookup, and their bodies are not needed
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(20)))
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let mut cur = url.to_string();
+    for _ in 0..12 {
+        let r = match agent.get(&cur).header("User-Agent", UA).header("Range", "bytes=0-0").call() {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("[resolve] {e}");
+                return None;
+            }
+        };
+        let h = |n: &str| r.headers().get(n).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+        let code = r.status().as_u16();
+        if (300..400).contains(&code) {
+            let next = h("location")?;
+            cur = join_url(&cur, &next);
+            continue;
+        }
+        let len: u64 = match h("content-range") {
+            Some(cr) if code == 206 => cr.rsplit('/').next()?.parse().ok()?,
+            // the server ignored the range: it cannot be read in pieces, so it is played as a stream
+            _ => return None,
+        };
+        return (len > 1000).then_some((cur, len));
+    }
+    None
+}
+
+/// Resolves a redirect target against the address that sent it.
+fn join_url(base: &str, r: &str) -> String {
+    if r.starts_with("http://") || r.starts_with("https://") {
+        return r.to_string();
+    }
+    let scheme_end = base.find("://").map(|i| i + 3).unwrap_or(0);
+    if r.starts_with('/') {
+        let host_end = base[scheme_end..].find('/').map(|i| i + scheme_end).unwrap_or(base.len());
+        return format!("{}{}", &base[..host_end], r);
+    }
+    let path = base.split(['?', '#']).next().unwrap_or(base);
+    let dir = path.rfind('/').filter(|i| *i >= scheme_end).map(|i| &path[..=i]).unwrap_or(path);
+    format!("{dir}{r}")
 }
 
 /// What the player needs to open an episode. The length comes from the feed, or from the file.

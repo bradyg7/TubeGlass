@@ -104,6 +104,9 @@ fn handle(mut sock: TcpStream, url: &str, ua: &str, len: u64, stop: &AtomicBool)
         Some((a, b)) => (a.min(len.saturating_sub(1)), b.unwrap_or(len - 1).min(len - 1), "206 Partial Content"),
         None => (0, len - 1, "200 OK"),
     };
+    if start > end {
+        return sock.write_all(b"HTTP/1.1 416 Range Not Satisfiable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+    }
     // get the first chunk before answering, so an upstream failure becomes a clean HTTP error
     // for ffmpeg instead of a cut-off body
     let agent = shared_agent();
@@ -393,7 +396,7 @@ fn dec(s: &str) -> String {
     let mut o = Vec::with_capacity(b.len());
     let mut i = 0;
     while i < b.len() {
-        if b[i] == b'%' && i + 2 < b.len() && let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+        if b[i] == b'%' && i + 2 < b.len() && let Some(v) = s.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok()) {
             o.push(v);
             i += 3;
         } else {

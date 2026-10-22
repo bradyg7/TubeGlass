@@ -18,8 +18,8 @@ pub fn normalize_arg(arg: &str) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() + 0 && i + 2 <= bytes.len() - 1 + 1 {
-            if let Ok(b) = u8::from_str_radix(&rest[i + 1..i + 3], 16) {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Some(b) = rest.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok()) {
                 out.push(b);
                 i += 3;
                 continue;

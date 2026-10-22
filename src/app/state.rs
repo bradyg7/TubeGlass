@@ -127,6 +127,8 @@ pub(crate) struct App {
     pub(crate) batch_total: usize,
     pub(crate) last_dir: Option<std::path::PathBuf>,
     pub(crate) viz_levels: Vec<f32>,
+    /// Frames in a row that ended in a panic (see `App::ui`).
+    pub(crate) panics: u8,
     pub(crate) lists: Vec<LocalList>,
     pub(crate) new_list: Option<(String, Option<Video>)>,
     pub(crate) jobs: Vec<DlJob>,

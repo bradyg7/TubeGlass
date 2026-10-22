@@ -93,6 +93,24 @@ pub fn command(program: &str) -> Command {
     c
 }
 
+/// Writes every panic (with where it happened) to `crash.log` next to the app's data, so a crash
+/// can be reported with details. The message also still goes to the terminal.
+pub fn install_crash_log() {
+    let path = dirs::data_dir().unwrap_or_else(|| PathBuf::from(".")).join("tubeglass").join("crash.log");
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        use std::io::Write;
+        let _ = std::fs::create_dir_all(path.parent().unwrap_or(Path::new(".")));
+        if std::fs::metadata(&path).is_ok_and(|m| m.len() > 200_000) {
+            let _ = std::fs::remove_file(&path);
+        }
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+            let _ = writeln!(f, "[{}] v{} {}\n{}\n", crate::util::now_secs(), env!("CARGO_PKG_VERSION"), info, std::backtrace::Backtrace::force_capture());
+        }
+        default(info);
+    }));
+}
+
 /// Makes helper programs findable. An app started from the macOS Finder gets a bare PATH that
 /// leaves out Homebrew, where ffmpeg usually lives.
 pub fn prepare_environment() {

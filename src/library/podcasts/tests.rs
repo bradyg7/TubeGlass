@@ -72,6 +72,45 @@ mod live {
         println!("stream duration {:.0}s", st.duration);
         assert!(st.duration > 60.0);
     }
+
+    #[test]
+    #[ignore = "network"]
+    fn decode_speed() {
+        let ff = std::env::var("TUBEGLASS_FFMPEG").unwrap_or("ffmpeg".into());
+        for q in ["joe rogan", "diary of a ceo", "techcrunch daily crunch", "dateline nbc", "darknet diaries", "bbc"] {
+            let Ok(hits) = search(q) else { continue };
+            let Some(h) = hits.first() else { continue };
+            let Ok((_, eps)) = fetch(&h.feed) else { continue };
+            let st = build_streams(&eps[0]);
+            let o = &st.video[0];
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let url = if o.hls { crate::proxy::serve_hls(&o.url, &o.ua, stop.clone()) } else { crate::proxy::serve(&o.url, &o.ua, stop.clone()) }.unwrap();
+            let t = std::time::Instant::now();
+            let out = std::process::Command::new(&ff).args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", "600", "-i", &url, "-t", "60", "-vn", "-f", "null", "-"]).output().unwrap();
+            println!("{} :: hls={} {:.1}s for 60s audio :: {} {}", h.title, o.hls, t.elapsed().as_secs_f32(), out.status, String::from_utf8_lossy(&out.stderr).chars().take(150).collect::<String>());
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    #[test]
+    #[ignore = "network"]
+    fn survey_many_shows() {
+        for q in ["news", "true crime", "comedy", "history", "science", "business", "sports", "technology", "bbc", "npr", "joe rogan", "kenya", "swahili", "sermon", "meditation"] {
+            let Ok(hits) = search(q) else { println!("SEARCH FAIL {q}"); continue };
+            for h in hits.iter().take(4) {
+                match fetch(&h.feed) {
+                    Err(e) => println!("FEED FAIL {} :: {e}", h.title),
+                    Ok((_, eps)) => match eps.first() {
+                        None => println!("NO EPISODES {}", h.title),
+                        Some(e) => {
+                            let r = resolve(&e.url);
+                            println!("{} :: {} :: {}", if r.is_some() { "ok      " } else { "NORESOLVE" }, h.title, e.url.chars().take(400).collect::<String>());
+                        }
+                    },
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -11,8 +11,24 @@ impl eframe::App for App {
         save_history(&self.history);
     }
 
-    /// Runs once per frame: handles messages and keys, then lays out the sidebar, player and the current page.
+    /// Runs once per frame. A bug in one page must not close the app, so a panic while drawing is
+    /// written to the crash log and the next frame simply tries again.
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.draw(ui))).is_err() {
+            self.toast("Something went wrong on this page (details are in crash.log)".to_string());
+            // a page that panics every frame would spin: go back to a safe page after a repeat
+            self.panics += 1;
+            if self.panics >= 3 {
+                self.panics = 0;
+                self.sel = Sel::Home;
+            }
+        }
+    }
+}
+
+impl App {
+    /// Handles messages and keys, then lays out the sidebar, player and the current page.
+    fn draw(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let ctx = &ctx;
         self.sync_look(ctx);
