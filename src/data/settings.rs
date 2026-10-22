@@ -45,6 +45,12 @@ pub(crate) struct Settings {
     pub(crate) dl_extras: bool,
     pub(crate) notifications: bool,
     pub(crate) accent: usize,
+    /// look for a newer release on GitHub now and then
+    pub(crate) update_check: bool,
+    /// a version the user chose not to be reminded about
+    pub(crate) skipped_version: String,
+    /// unix time of the last successful check (so the API is not asked at every start)
+    pub(crate) last_update_check: u64,
     pub(crate) accent_custom: [u8; 3],
     /// 0 dark, 1 light, 2 follow the system
     pub(crate) theme: u8,
@@ -86,6 +92,9 @@ impl Default for Settings {
             dl_extras: true,
             notifications: false,
             accent: 0,
+            update_check: true,
+            skipped_version: String::new(),
+            last_update_check: 0,
             accent_custom: [255, 154, 31],
             theme: 0,
             font_scale: 1.0,

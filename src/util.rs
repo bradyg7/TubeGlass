@@ -8,12 +8,6 @@ pub(crate) fn uid(salt: impl std::hash::Hash + std::fmt::Debug) -> egui::Id {
     egui::Id::new(salt)
 }
 
-/// `owner/name` of the GitHub project, taken from the `repository` field of Cargo.toml.
-pub(crate) fn github_repo() -> Option<String> {
-    let r = env!("CARGO_PKG_REPOSITORY").trim_end_matches('/').trim_end_matches(".git");
-    r.split_once("github.com/").map(|(_, p)| p.to_string()).filter(|p| p.contains('/'))
-}
-
 /// Current unix time in seconds.
 pub(crate) fn now_secs() -> u64 {
     std::time::SystemTime::now()

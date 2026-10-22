@@ -9,6 +9,7 @@ pub mod library;
 pub mod messages;
 pub mod navigation;
 pub mod integration;
+pub mod updater;
 pub mod frame;
 
 #[allow(unused_imports)]

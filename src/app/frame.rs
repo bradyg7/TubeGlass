@@ -32,6 +32,7 @@ impl eframe::App for App {
         self.sync_offline_lists();
         self.track_stats();
         self.pod_auto_refresh();
+        self.update_tick();
         self.track_navigation();
         self.track_window(ctx);
         if self.release_focus {
@@ -137,6 +138,11 @@ impl eframe::App for App {
                 .resizable(false)
                 .frame(egui::Frame::new().fill(panel()).inner_margin(egui::Margin::same(14)))
                 .show(ui, |ui| self.comments_panel(ui));
+        }
+
+        // a newer release was found on GitHub
+        if !in_player {
+            self.update_bar(ui);
         }
 
         if !self.online && !in_player {

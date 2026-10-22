@@ -201,6 +201,10 @@ pub(crate) enum Msg {
     Imported(Vec<subs::Imported>),
     ExportedSubs(usize),
     Online(bool),
+    /// Result of looking for a newer release (`true` = the user asked for it).
+    UpdateChecked(Result<Option<update::Release>, String>, bool),
+    UpdateProgress(f32),
+    UpdateDownloaded(Result<std::path::PathBuf, String>),
     Podcast(String, bool, Result<(String, podcasts::Show, Vec<podcasts::Episode>), String>),
     PodSearch(String, Result<Vec<podcasts::Hit>, String>),
     Transcript(String, Result<Vec<yt::Cue>, String>),

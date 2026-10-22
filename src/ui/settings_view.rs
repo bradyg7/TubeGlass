@@ -310,13 +310,17 @@ impl App {
                         restore = true;
                     }
                 });
-                if let Some(repo) = github_repo() {
-                    row(ui, "Check for updates", &format!("You have {}; looks at the latest release of {repo}", env!("CARGO_PKG_VERSION")), &mut |ui| {
-                        if ui.button("Check").clicked() {
-                            check_update = true;
-                        }
-                    });
-                }
+                row(ui, "Check for updates automatically", "Looks at the project's GitHub releases now and then (nothing else is sent)", &mut |ui| {
+                    changed |= switch(ui, &mut self.settings.update_check);
+                });
+                let note = self.update_note.clone().unwrap_or_else(|| format!("You have version {}", update::CURRENT));
+                row(ui, "Check for updates now", &note, &mut |ui| {
+                    if self.update_checking {
+                        ui.add(egui::Spinner::new().size(16.0).color(accent()));
+                    } else if ui.button("Check now").clicked() {
+                        check_update = true;
+                    }
+                });
                 row(ui, "Check YouTube access", "Tests search, playback, comments and music, to see what broke if something stops working", &mut |ui| {
                     if self.diag_running {
                         ui.add(egui::Spinner::new().size(16.0).color(accent()));
@@ -463,24 +467,8 @@ impl App {
             self.refresh_storage();
         }
         if check_update {
-            if let Some(repo) = github_repo() {
-                let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
-                std::thread::spawn(move || {
-                    let r = ureq::get(&format!("https://api.github.com/repos/{repo}/releases/latest"))
-                        .header("User-Agent", "TubeGlass")
-                        .call()
-                        .ok()
-                        .and_then(|mut r| r.body_mut().read_json::<serde_json::Value>().ok())
-                        .and_then(|v| v["tag_name"].as_str().map(|t| t.trim_start_matches('v').to_string()));
-                    let msg = match r {
-                        Some(t) if t != env!("CARGO_PKG_VERSION") => format!("Version {t} is available"),
-                        Some(_) => "You have the latest version".to_string(),
-                        None => "Could not check for updates".to_string(),
-                    };
-                    let _ = tx.send(Msg::Note(msg));
-                    ctx.request_repaint();
-                });
-            }
+            // a skipped version is offered again when the user asks
+            self.check_for_update(true);
         }
         if diagnose {
             self.diag_running = true;

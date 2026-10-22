@@ -21,6 +21,7 @@ pub mod views;
 pub mod music_ui;
 pub mod side_tools;
 pub mod podcasts_view;
+pub mod update_view;
 
 #[allow(unused_imports)]
 pub(crate) use theme::*;

@@ -255,15 +255,15 @@ impl App {
                 Msg::Restored => {
                     // the new process loads the restored files; leaving without the usual
                     // save on exit keeps the old state from overwriting them
-                    if let Ok(exe) = std::env::current_exe() {
-                        let _ = std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg("sleep 1; exec \"$0\"")
-                            .arg(exe)
-                            .spawn();
-                    }
-                    std::process::exit(0);
+                    crate::platform::restart();
                 }
+                Msg::UpdateChecked(r, manual) => self.apply_update_check(r, manual),
+                Msg::UpdateProgress(p) => {
+                    if matches!(self.update_state, UpdateState::Downloading(_)) {
+                        self.update_state = UpdateState::Downloading(p);
+                    }
+                }
+                Msg::UpdateDownloaded(r) => self.finish_update(r),
                 Msg::Online(up) => {
                     let was = self.online;
                     self.online = up;

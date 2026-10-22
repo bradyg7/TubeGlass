@@ -44,6 +44,13 @@ pub(crate) struct App {
     pub(crate) stat_saved: Instant,
     pub(crate) look_sig: (bool, usize, [u8; 3]),
     pub(crate) online: bool,
+    /// a newer release that is available
+    pub(crate) update: Option<update::Release>,
+    pub(crate) update_state: UpdateState,
+    pub(crate) update_next_check: Instant,
+    pub(crate) update_checking: bool,
+    pub(crate) update_note: Option<String>,
+    pub(crate) update_notes_open: bool,
     pub(crate) online_known: bool,
     pub(crate) mini: bool,
     pub(crate) pre_mini: Option<(f32, f32)>,
@@ -165,4 +172,16 @@ pub(crate) struct App {
     pub(crate) last_refresh: Instant,
     pub(crate) fullscreen: bool,
     pub(crate) ctx: egui::Context,
+}
+
+/// Where the download of an available update stands.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum UpdateState {
+    /// nothing started
+    Idle,
+    /// downloading (0–1)
+    Downloading(f32),
+    /// finished: the file was saved here (and installed, for an AppImage)
+    Done(std::path::PathBuf, bool),
+    Failed(String),
 }

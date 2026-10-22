@@ -5,3 +5,4 @@ pub mod clip;
 pub mod subs;
 pub mod podcasts;
 pub mod insights;
+pub mod update;
