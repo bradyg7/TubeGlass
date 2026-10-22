@@ -49,7 +49,7 @@ impl App {
         let resp = ui.interact(rect, ui.scope_id().with(("epcard", &vid)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
         let hv = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
         let art = if e.image.is_empty() { &show.image } else { &e.image };
-        let uri = img_uri(ui.ctx(), art);
+        let uri = if ui.is_rect_visible(rect) { img_uri(ui.ctx(), art) } else { String::new() };
         let mut bits: Vec<String> = vec![];
         if with_show {
             bits.push(show.title.clone());
@@ -146,7 +146,8 @@ impl App {
         let th_r = Rect::from_min_size(rect.min + vec2(8.0, 6.0), vec2(72.0, 72.0));
         ui.painter().rect_filled(th_r, CornerRadius::same(10), card_hi());
         let art = if e.image.is_empty() { &show.image } else { &e.image };
-        let uri = img_uri(ui.ctx(), art);
+        // pictures are only fetched and decoded for rows that are on screen
+        let uri = if ui.is_rect_visible(rect) { img_uri(ui.ctx(), art) } else { String::new() };
         if !uri.is_empty() {
             egui::Image::new(uri).fit_to_exact_size(th_r.size()).corner_radius(CornerRadius::same(10)).paint_at(ui, th_r);
         }
@@ -576,13 +577,30 @@ impl App {
         });
         ui.add_space(10.0);
         let mut act: Option<(String, A)> = None;
-        egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+        // a show can have hundreds of episodes: show a page at a time and add the next one
+        // when the scroll gets near the end
+        const PAGE: usize = 30;
+        if self.pod_shown.0 != feed {
+            self.pod_shown = (feed.to_string(), PAGE);
+        }
+        let shown = self.pod_shown.1.min(p.episodes.len());
+        let out = egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             let w = ui.available_width() - 6.0;
-            let list: Vec<(&str, &Show, &Episode)> = p.episodes.iter().map(|e| (p.show.feed.as_str(), &p.show, e)).collect();
+            let list: Vec<(&str, &Show, &Episode)> = p.episodes.iter().take(shown).map(|e| (p.show.feed.as_str(), &p.show, e)).collect();
             if let Some((_, id, a)) = self.episode_list(ui, &list, w, false) {
                 act = Some((id, a));
             }
+            if shown < p.episodes.len() {
+                ui.add_space(6.0);
+                ui.vertical_centered(|ui| ui.label(egui::RichText::new(format!("Showing {shown} of {} episodes", p.episodes.len())).size(12.5).color(muted())));
+                ui.add_space(20.0);
+            }
         });
+        let near_end = out.state.offset().y + out.inner_rect.height() > out.content_size.y - 500.0;
+        if near_end && shown < p.episodes.len() {
+            self.pod_shown.1 = shown + PAGE;
+            ui.ctx().request_repaint();
+        }
         if let Some((id, a)) = act {
             self.do_ep_act(feed, &id, a);
         }

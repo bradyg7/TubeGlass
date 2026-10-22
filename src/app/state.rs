@@ -20,6 +20,8 @@ pub(crate) struct App {
     pub(crate) pod_err: Option<String>,
     pub(crate) pod_next_check: Instant,
     pub(crate) pod_unsub_confirm: bool,
+    /// The show whose episodes are listed and how many of them are shown so far (more load on scrolling).
+    pub(crate) pod_shown: (String, usize),
     pub(crate) err_retried: HashSet<String>,
     pub(crate) want_retry: bool,
     pub(crate) clip_linked_for: String,

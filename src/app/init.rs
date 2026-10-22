@@ -32,6 +32,7 @@ impl App {
             pod_err: None,
             pod_next_check: Instant::now() + Duration::from_secs(8),
             pod_unsub_confirm: false,
+            pod_shown: (String::new(), 0),
             err_retried: HashSet::new(),
             want_retry: false,
             clip_linked_for: String::new(),
