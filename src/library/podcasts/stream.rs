@@ -23,14 +23,9 @@ pub fn episode_video(show: &Show, e: &Episode) -> Video {
     }
 }
 
-/// Asks ffprobe for the length of a file when the feed does not say.
+/// Asks ffmpeg for the length of a file when the feed does not say.
 pub(crate) fn probe_duration(url: &str) -> f64 {
-    crate::platform::command("ffprobe")
-        .args(["-v", "error", "-user_agent", UA, "-show_entries", "format=duration", "-of", "csv=p=0", url])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<f64>().ok())
-        .unwrap_or(0.0)
+    crate::playback::media::inspect(url, &["-user_agent", UA]).map(|i| i.duration).unwrap_or(0.0)
 }
 
 /// Podcast links usually hop through two or three trackers before the file. Follow them once
