@@ -52,8 +52,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
+        shell: bash
         run: cargo build --release --locked 2>&1 | tee build.log
       - name: Package
+        shell: bash
         env:
           SKIP_BUILD: "1"
           APPIMAGE_EXTRACT_AND_RUN: "1"
@@ -118,6 +120,7 @@ jobs:
         with:
           key: ${{ matrix.arch }}
       - name: Build and package
+        shell: bash
         run: ./packaging/build-macos.sh ${{ matrix.arch }} 2>&1 | tee build.log
       - name: Show what failed
         if: failure()
