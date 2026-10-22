@@ -1,0 +1,48 @@
+# Builds and tests TubeGlass on Linux, Windows and macOS for every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-22.04 }
+          - { name: Windows, os: windows-latest }
+          - { name: macOS, os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev ffmpeg
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        shell: bash
+        run: cargo build --release --locked 2>&1 | tee build.log
+
+      - name: Test
+        shell: bash
+        run: cargo test --release --locked 2>&1 | tee test.log
+
+      - name: Show what failed
+        if: failure()
+        shell: bash
+        run: |
+          .github/scripts/annotate.sh "${{ matrix.name }} build" build.log
+          .github/scripts/annotate.sh "${{ matrix.name }} tests" test.log

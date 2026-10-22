@@ -1,0 +1,152 @@
+# Builds TubeGlass for every platform and, for a version tag (v0.2.0 ...), publishes a GitHub
+# release with all the files. Run it by hand (Actions > Release > Run workflow) to build
+# everything without publishing: the files are attached to the run.
+#
+# File names matter: the app's update checker picks its download by them.
+#   TubeGlass-<version>-linux-<arch>.AppImage / .tar.gz     tubeglass_<version>_<amd64|arm64>.deb
+#   TubeGlass-<version>-windows-x86_64.zip                  TubeGlass-<version>-macos-<arch>.dmg
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+    # pushing this branch builds every platform without publishing anything
+    branches: [release-dryrun]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  version:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must match the version in Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$want" != "$have" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml version $have"
+            exit 1
+          fi
+
+  linux:
+    name: Linux ${{ matrix.arch }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04, arch: x86_64 }
+          - { os: ubuntu-22.04-arm, arch: aarch64 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked 2>&1 | tee build.log
+      - name: Package
+        env:
+          SKIP_BUILD: "1"
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          curl -fsSL -o appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.arch }}.AppImage"
+          chmod +x appimagetool
+          export PATH="$PWD:$PATH"
+          ./packaging/build-deb.sh
+          ./packaging/build-tarball.sh
+          ./packaging/build-appimage.sh
+          ls -la dist
+      - name: Show what failed
+        if: failure()
+        run: .github/scripts/annotate.sh "Linux ${{ matrix.arch }}" build.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            dist/*.deb
+            dist/*.tar.gz
+            dist/*.AppImage
+          if-no-files-found: error
+
+  windows:
+    name: Windows x86_64
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        shell: bash
+        run: cargo build --release --locked 2>&1 | tee build.log
+      - name: Package
+        shell: pwsh
+        run: ./packaging/build-windows.ps1
+      - name: Show what failed
+        if: failure()
+        shell: bash
+        run: .github/scripts/annotate.sh "Windows" build.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/*.zip
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    needs: version
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch }}-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.arch }}
+      - name: Build and package
+        run: ./packaging/build-macos.sh ${{ matrix.arch }} 2>&1 | tee build.log
+      - name: Show what failed
+        if: failure()
+        run: .github/scripts/annotate.sh "macOS ${{ matrix.arch }}" build.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd files
+          sha256sum * > SHA256SUMS.txt
+          ls -la
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: files/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

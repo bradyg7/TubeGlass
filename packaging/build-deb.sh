@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds tubeglass_<version>_<arch>.deb without needing dpkg (only ar + tar).
 #   ./packaging/build-deb.sh            -> dist/tubeglass_0.1.0_amd64.deb
+# Set SKIP_BUILD=1 to package an already built target/release/tubeglass.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,13 +12,14 @@ case "$(uname -m)" in
   *) ARCH=$(uname -m) ;;
 esac
 
-cargo build --release
+[[ -n "${SKIP_BUILD:-}" ]] || cargo build --release --locked
 ROOT=$(mktemp -d)
 trap 'rm -rf "$ROOT"' EXIT
 
 install -Dm755 target/release/tubeglass "$ROOT/data/usr/bin/tubeglass"
 install -Dm644 packaging/tubeglass.desktop "$ROOT/data/usr/share/applications/tubeglass.desktop"
 install -Dm644 packaging/tubeglass.svg "$ROOT/data/usr/share/icons/hicolor/scalable/apps/tubeglass.svg"
+install -Dm644 LICENSE "$ROOT/data/usr/share/doc/tubeglass/copyright"
 
 mkdir -p "$ROOT/control"
 INSTALLED_KB=$(du -sk "$ROOT/data" | cut -f1)
@@ -30,10 +32,12 @@ Architecture: $ARCH
 Depends: ffmpeg, libasound2 | libasound2t64, libgl1, libxkbcommon0
 Recommends: xdg-desktop-portal
 Installed-Size: $INSTALLED_KB
-Maintainer: TubeGlass <noreply@example.com>
-Description: YouTube client and media player
- Follow channels, watch live streams, download for offline,
- and play local audio and video. No account or API key needed.
+Maintainer: flawlesscode254 <flawlesscode254@users.noreply.github.com>
+Homepage: https://github.com/flawlesscode254/TubeGlass
+Description: YouTube, YouTube Music and podcast client
+ Follow channels, watch live streams, listen to music and podcasts,
+ download for offline use, and play local audio and video.
+ No account or API key needed.
 CTL
 cat > "$ROOT/control/postinst" <<'POST'
 #!/bin/sh

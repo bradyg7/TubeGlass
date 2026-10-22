@@ -1,0 +1,32 @@
+# YouTube changes its internals now and then. This runs the live tests every day, so a
+# break shows up as a failed run (and an issue) before anyone notices it while watching.
+name: YouTube canary
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev libxkbcommon-dev libwayland-dev libx11-dev ffmpeg
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - id: run
+        run: cargo test --release -- --ignored
+        continue-on-error: true
+      - name: Open an issue when it broke
+        if: steps.run.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "YouTube canary failed ($(date -u +%F))" \
+            --body "The live tests failed. See ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true
+          exit 1

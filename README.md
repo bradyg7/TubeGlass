@@ -39,13 +39,49 @@ A YouTube desktop client and media player in Rust (egui). No account, no API key
 Requires `ffmpeg` and `ffprobe` on PATH. Run with `cargo run --release`.
 
 ## Install
+
+Download the file for your system from the [latest release](https://github.com/flawlesscode254/TubeGlass/releases/latest):
+
+| System | File | How |
+| --- | --- | --- |
+| Linux (any) | `TubeGlass-<version>-linux-<arch>.AppImage` | `chmod +x` it and run; it updates itself from inside the app |
+| Debian / Ubuntu | `tubeglass_<version>_<amd64\|arm64>.deb` | `sudo apt install ./tubeglass_*.deb` |
+| Linux (other) | `TubeGlass-<version>-linux-<arch>.tar.gz` | unpack and run `./install.sh` (no root needed) |
+| Arch Linux | `packaging/PKGBUILD` | `makepkg -si` |
+| Windows 10/11 | `TubeGlass-<version>-windows-x86_64.zip` | unzip and run `TubeGlass.exe` |
+| macOS 11+ | `TubeGlass-<version>-macos-<aarch64\|x86_64>.dmg` | drag TubeGlass to Applications; the first time, right-click it and choose *Open* (the app is not notarised) |
+
+TubeGlass needs **ffmpeg** on your system. If it is missing the app says so and shows the command:
+`sudo apt install ffmpeg`, `brew install ffmpeg` or `winget install ffmpeg`.
+
+Linux gets everything (media keys through MPRIS, desktop notifications, "Open with"). macOS and
+Windows do not have media-key integration yet, and macOS double-click "Open with" is not wired up
+(use *Open file…* in the app).
+
+### Updates
+
+TubeGlass checks this repository's releases a few seconds after it starts (and every few hours
+while it is open). When a newer version exists a bar appears with **Update**, **What's new** and
+**Skip this version**. *Update* downloads the right file for your system and checks it; an
+AppImage replaces itself and offers a restart, other formats open in your installer or file
+manager. Turn the check off in *Settings*.
+
+### Build from source
+
 ```
-./install.sh               # user install, adds "Open With" entries
-./install.sh --default     # ...and become the default player for media files
-./packaging/build-deb.sh   # dist/tubeglass_<version>_<arch>.deb
-./packaging/build-appimage.sh
-(cd packaging && makepkg -si)   # Arch
+cargo run --release          # needs ffmpeg and a Rust toolchain
+./install.sh                 # build and install for the current user (Linux)
 ```
+
+On Linux the build needs `pkg-config`, `libasound2-dev`, `libxkbcommon-dev` and `libwayland-dev`.
+
+## Releasing
+
+1. Raise `version` in `Cargo.toml` and commit it.
+2. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
+3. The *Release* workflow builds every platform and publishes the release with checksums.
+   Pushing the branch `release-dryrun` (or Actions > Release > *Run workflow*) builds everything
+   without publishing; the files are attached to the run.
 
 ## Keys
 `Space/K` play·pause, `←/→` ±5s, `J/L` ±10s, `↑/↓` volume, `M` mute, `[ ]` speed, `N/P` next·previous,
@@ -63,5 +99,9 @@ src/
   youtube/       YouTube and YouTube Music extraction (no account, no API key)
   playback/      ffmpeg player, local range proxy, local files, MPRIS media keys
   library/       downloads, clips, podcasts, subscriptions import, statistics
+  platform.rs    the few things that differ between Linux, macOS and Windows
   util.rs        small helpers
+build.rs         embeds the icon in the Windows executable
+packaging/       .deb, AppImage, tarball, macOS .app/.dmg, Windows zip, PKGBUILD, icons
+.github/         CI, release and daily YouTube-canary workflows
 ```
