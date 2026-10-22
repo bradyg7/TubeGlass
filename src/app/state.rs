@@ -50,6 +50,9 @@ pub(crate) struct App {
     pub(crate) update_next_check: Instant,
     pub(crate) update_checking: bool,
     pub(crate) update_note: Option<String>,
+    /// ffmpeg was not found at launch (playback and downloads cannot work without it)
+    pub(crate) ffmpeg_missing: bool,
+    pub(crate) ffmpeg_hidden: bool,
     pub(crate) update_notes_open: bool,
     pub(crate) online_known: bool,
     pub(crate) mini: bool,

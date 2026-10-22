@@ -201,6 +201,8 @@ pub(crate) enum Msg {
     Imported(Vec<subs::Imported>),
     ExportedSubs(usize),
     Online(bool),
+    /// Whether ffmpeg could be started at launch.
+    FfmpegChecked(bool),
     /// Result of looking for a newer release (`true` = the user asked for it).
     UpdateChecked(Result<Option<update::Release>, String>, bool),
     UpdateProgress(f32),

@@ -61,6 +61,8 @@ impl App {
             update_next_check: Instant::now() + Duration::from_secs(20),
             update_checking: false,
             update_note: None,
+            ffmpeg_missing: false,
+            ffmpeg_hidden: false,
             update_notes_open: false,
             online_known: false,
             mini: false,
@@ -192,6 +194,14 @@ impl App {
             app.restore_page(&saved_page);
         }
         app.mpris = Some(mpris::start());
+        // everything (playback, downloads, clips) runs through ffmpeg: say so early if it is missing
+        {
+            let (tx, ctx) = (app.tx.clone(), app.ctx.clone());
+            std::thread::spawn(move || {
+                let _ = tx.send(Msg::FfmpegChecked(crate::platform::ffmpeg_available()));
+                ctx.request_repaint();
+            });
+        }
         // watch the connection so the app can fall back to what is saved on this computer
         {
             let (tx, ctx) = (app.tx.clone(), app.ctx.clone());

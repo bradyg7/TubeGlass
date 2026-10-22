@@ -264,6 +264,7 @@ impl App {
                     }
                 }
                 Msg::UpdateDownloaded(r) => self.finish_update(r),
+                Msg::FfmpegChecked(ok) => self.ffmpeg_missing = !ok,
                 Msg::Online(up) => {
                     let was = self.online;
                     self.online = up;

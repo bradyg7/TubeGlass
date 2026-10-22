@@ -142,6 +142,7 @@ impl eframe::App for App {
 
         // a newer release was found on GitHub
         if !in_player {
+            self.ffmpeg_bar(ui);
             self.update_bar(ui);
         }
 

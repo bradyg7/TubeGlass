@@ -18,6 +18,37 @@ pub fn command(program: &str) -> Command {
     c
 }
 
+/// Makes helper programs findable. An app started from the macOS Finder gets a bare PATH that
+/// leaves out Homebrew, where ffmpeg usually lives.
+pub fn prepare_environment() {
+    if cfg!(target_os = "macos") {
+        let mut parts: Vec<std::path::PathBuf> = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"].iter().map(std::path::PathBuf::from).collect();
+        if let Some(p) = std::env::var_os("PATH") {
+            parts.extend(std::env::split_paths(&p));
+        }
+        if let Ok(joined) = std::env::join_paths(parts) {
+            // SAFETY: called once at start-up, before any other thread exists
+            unsafe { std::env::set_var("PATH", joined) };
+        }
+    }
+}
+
+/// True when `ffmpeg` can be started.
+pub fn ffmpeg_available() -> bool {
+    command("ffmpeg").arg("-version").stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().is_ok_and(|s| s.success())
+}
+
+/// How to install ffmpeg on this system, as one line of advice.
+pub fn ffmpeg_hint() -> &'static str {
+    if cfg!(windows) {
+        "Install it with:  winget install ffmpeg   (then restart TubeGlass)"
+    } else if cfg!(target_os = "macos") {
+        "Install it with:  brew install ffmpeg   (then restart TubeGlass)"
+    } else {
+        "Install it with your package manager, e.g.  sudo apt install ffmpeg  or  sudo pacman -S ffmpeg"
+    }
+}
+
 /// Opens a file or folder with whatever the desktop uses for it (file manager, default player).
 pub fn open_path(path: &Path) {
     let program = if cfg!(target_os = "macos") {

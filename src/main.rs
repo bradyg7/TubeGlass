@@ -43,6 +43,7 @@ use yt::{Channel, ChannelAbout, ChannelHeader, ChannelHit, Comment, Kind, Playli
 
 /// Opens the window and runs the app until it is closed.
 fn main() -> eframe::Result<()> {
+    platform::prepare_environment();
     let ws = load_win();
     let size = if ws.w >= 820.0 && ws.h >= 520.0 { [ws.w, ws.h] } else { [1360.0, 840.0] };
     let mut vb = egui::ViewportBuilder::default();

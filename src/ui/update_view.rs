@@ -4,6 +4,42 @@ use crate::*;
 use crate::update;
 
 impl App {
+    /// A bar that explains how to install ffmpeg when it was not found at launch.
+    pub(crate) fn ffmpeg_bar(&mut self, ui: &mut egui::Ui) {
+        if !self.ffmpeg_missing || self.ffmpeg_hidden {
+            return;
+        }
+        let (mut open, mut hide) = (false, false);
+        egui::Panel::top("ffmpeg-bar")
+            .exact_size(44.0)
+            .resizable(false)
+            .frame(egui::Frame::new().fill(LIVE.gamma_multiply(0.28)).inner_margin(egui::Margin::symmetric(24, 6)))
+            .show(ui, |ui| {
+                ui.horizontal_centered(|ui| {
+                    ui.label(egui::RichText::new("ffmpeg was not found, so nothing can play yet.").strong().size(14.0));
+                    // the advice gives way (with an ellipsis) so the buttons always stay visible
+                    let room = (ui.available_width() - 210.0).max(80.0);
+                    ui.allocate_ui(vec2(room, 24.0), |ui| {
+                        ui.add(egui::Label::new(egui::RichText::new(crate::platform::ffmpeg_hint()).size(13.0).color(muted())).truncate());
+                    });
+                    if icon_btn(ui, "", "Download ffmpeg", None, ink(), false, true).clicked() {
+                        open = true;
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if icon_btn(ui, "close", "", None, ink(), false, true).on_hover_text("Hide").clicked() {
+                            hide = true;
+                        }
+                    });
+                });
+            });
+        if open {
+            crate::platform::open_url("https://ffmpeg.org/download.html");
+        }
+        if hide {
+            self.ffmpeg_hidden = true;
+        }
+    }
+
     /// Draws the update bar (nothing when there is no update). Returns its height so callers
     /// can place other things around it; the bar itself is a top panel.
     pub(crate) fn update_bar(&mut self, ui: &mut egui::Ui) {
