@@ -44,12 +44,7 @@ const KEEP_DAYS: usize = 800;
 
 /// Local calendar day of a unix time.
 pub fn day_key(t: u64) -> String {
-    unsafe {
-        let tt = t as libc::time_t;
-        let mut tm: libc::tm = std::mem::zeroed();
-        libc::localtime_r(&tt, &mut tm);
-        format!("{:04}-{:02}-{:02}", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday)
-    }
+    crate::platform::local_day_key(t)
 }
 
 /// Formats seconds as "1h 05m", "12m" or "<1m".

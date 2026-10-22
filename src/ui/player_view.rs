@@ -135,8 +135,8 @@ impl App {
                 .watching
                 .as_ref()
                 .map(|w| {
-                    if w.thumb.starts_with('/') {
-                        format!("file://{}", w.thumb)
+                    if crate::platform::is_local_path(&w.thumb) {
+                        crate::platform::file_uri(&w.thumb)
                     } else if w.thumb.is_empty() {
                         String::new()
                     } else {
@@ -1071,7 +1071,7 @@ impl App {
         let ir = ui.interact(info, uid("np-open"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
         let cover = Rect::from_min_size(Pos2::new(info.min.x + 4.0, cy - 25.0), vec2(50.0, 50.0));
         ui.painter().rect_filled(cover, CornerRadius::same(8), card_hi());
-        let uri = if w.thumb.starts_with('/') { format!("file://{}", w.thumb) } else { img_uri(ui.ctx(), &w.thumb) };
+        let uri = if crate::platform::is_local_path(&w.thumb) { crate::platform::file_uri(&w.thumb) } else { img_uri(ui.ctx(), &w.thumb) };
         if !uri.is_empty() {
             egui::Image::new(uri).fit_to_exact_size(cover.size()).corner_radius(CornerRadius::same(8)).paint_at(ui, cover);
         } else {

@@ -1,3 +1,5 @@
+#![cfg_attr(all(not(debug_assertions), windows), windows_subsystem = "windows")]
+
 //! TubeGlass: a desktop YouTube client (videos, music and podcasts) written in Rust.
 //!
 //! The code is organised in layers:
@@ -8,11 +10,13 @@
 //! * [`youtube`]  – talking to YouTube and YouTube Music (no account, no API key).
 //! * [`playback`] – the ffmpeg-based player, the local range proxy, MPRIS media keys.
 //! * [`library`]  – downloads, clips, podcasts, subscriptions import and statistics.
+//! * [`platform`] – the few things that differ between Linux, macOS and Windows.
 //! * [`util`]     – small helpers.
 
 mod app;
 mod data;
 mod library;
+mod platform;
 mod playback;
 mod ui;
 mod util;

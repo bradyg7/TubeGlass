@@ -394,7 +394,7 @@ impl App {
             self.want_retry = false;
             return;
         };
-        let local = non_yt(&w.id) || self.player.streams.as_ref().is_some_and(|s| s.video.first().is_some_and(|v| v.url.starts_with('/')));
+        let local = non_yt(&w.id) || self.player.streams.as_ref().is_some_and(|s| s.video.first().is_some_and(|v| crate::platform::is_local_path(&v.url)));
         if local {
             return;
         }

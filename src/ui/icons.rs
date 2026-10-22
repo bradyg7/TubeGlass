@@ -412,7 +412,9 @@ mod tests {
     #[test]
     fn dump_icon() {
         if let Ok(path) = std::env::var("ICON_OUT") {
-            std::fs::write(path, super::render_app_icon(256)).unwrap();
+            // ICON_SIZE picks the edge length (default 256); the output is raw RGBA
+            let size = std::env::var("ICON_SIZE").ok().and_then(|v| v.parse().ok()).unwrap_or(256);
+            std::fs::write(path, super::render_app_icon(size)).unwrap();
         }
     }
 }

@@ -6,7 +6,7 @@ use crate::yt::{CaptionTrack, Cue, Streams};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// A finished download as listed in the library (one sidecar .json per file).
@@ -342,7 +342,7 @@ fn fetch_to_file(
 
 /// Runs ffmpeg with the given arguments, returning its last error lines on failure.
 fn run_ffmpeg_copy(args: &[&std::ffi::OsStr]) -> Result<(), String> {
-    let out = Command::new("ffmpeg")
+    let out = crate::platform::command("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"])
         .args(args)
         .output()
@@ -505,7 +505,7 @@ fn run_hls(
     on_progress: &dyn Fn(f32, u64),
 ) -> Result<(), String> {
     let part = dir.join(format!("{stem}.part"));
-    let mut cmd = Command::new("ffmpeg");
+    let mut cmd = crate::platform::command("ffmpeg");
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-user_agent", ua]);
     // an HLS variant with a separate audio rendition needs both playlists as inputs
     match audio_url {
@@ -526,7 +526,7 @@ fn run_hls(
     cmd.arg(&part);
     cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("could not start ffmpeg ({e})"))?;
-    let pid = child.id() as i32;
+    let pid = child.id();
     let mut err = child.stderr.take().unwrap();
     let err_thread = std::thread::spawn(move || {
         let mut s = String::new();
@@ -543,11 +543,14 @@ fn run_hls(
             return Err("cancelled".into());
         }
         if pause.load(Ordering::Relaxed) {
-            unsafe { libc::kill(pid, libc::SIGSTOP) };
+            // where processes cannot be frozen, the transfer simply carries on
+            let frozen = crate::platform::suspend_process(pid);
             while pause.load(Ordering::Relaxed) && !cancel.load(Ordering::Relaxed) {
                 std::thread::sleep(std::time::Duration::from_millis(120));
             }
-            unsafe { libc::kill(pid, libc::SIGCONT) };
+            if frozen {
+                crate::platform::resume_process(pid);
+            }
         }
         if let Some(us) = line
             .strip_prefix("out_time_us=")

@@ -25,7 +25,7 @@ pub fn episode_video(show: &Show, e: &Episode) -> Video {
 
 /// Asks ffprobe for the length of a file when the feed does not say.
 pub(crate) fn probe_duration(url: &str) -> f64 {
-    std::process::Command::new("ffprobe")
+    crate::platform::command("ffprobe")
         .args(["-v", "error", "-user_agent", UA, "-show_entries", "format=duration", "-of", "csv=p=0", url])
         .output()
         .ok()

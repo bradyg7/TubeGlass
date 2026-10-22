@@ -1,13 +1,16 @@
-//! Playback engine: one ffmpeg process decodes video to raw RGBA frames on stdout and
-//! PCM audio on fd 3. Audio goes to the sound card through cpal and its sample counter is
-//! the master clock that video frames are paced against.
+//! Playback engine: ffmpeg decodes video to raw RGBA frames on stdout and PCM audio on fd 3
+//! (Linux, macOS) or from a second ffmpeg process (Windows, or whenever the sound has its own
+//! source or filters). Audio goes to the sound card through cpal and its sample counter is the
+//! master clock that video frames are paced against.
 
 use crate::proxy;
 use crate::yt::{Streams, VideoOpt};
 use eframe::egui;
 use std::collections::VecDeque;
 use std::io::Read;
+#[cfg(unix)]
 use std::os::fd::AsRawFd;
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
@@ -662,14 +665,14 @@ fn sample_grid(rgba: &[u8], w: usize, h: usize) -> Vec<[u8; 3]> {
 fn spawn_audio_only(streams: &Streams, rate: u32, stop: Arc<AtomicBool>, afx: &str) -> Result<(Child, Box<dyn Read + Send>), String> {
     let (url, ua) = match (&streams.audio, streams.video.iter().max_by_key(|v| v.height)) {
         (Some(a), _) => (proxy::serve(&a.url, &a.ua, stop)?, a.ua.clone()),
-        (None, Some(v)) if v.url.starts_with('/') => (v.url.clone(), v.ua.clone()),
+        (None, Some(v)) if crate::platform::is_local_path(&v.url) => (v.url.clone(), v.ua.clone()),
         (None, Some(v)) if v.hls => (v.audio_url.clone().unwrap_or_else(|| v.url.clone()), v.ua.clone()),
         (None, Some(v)) => (proxy::serve(&v.url, &v.ua, stop)?, v.ua.clone()),
         _ => return Err("no stream".into()),
     };
-    let mut cmd = Command::new("ffmpeg");
+    let mut cmd = crate::platform::command("ffmpeg");
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
-    if !url.starts_with('/') {
+    if !crate::platform::is_local_path(&url) {
         cmd.args(["-user_agent", &ua, "-probesize", "1500000", "-analyzeduration", "1000000"]);
     }
     cmd.args(["-i", &url, "-map", "0:a:0?", "-vn"]);
@@ -709,6 +712,7 @@ fn spawn(
     let t0 = Instant::now();
     let dbg = std::env::var_os("TG_DEBUG").is_some();
     let (pr, pw) = std::io::pipe().map_err(|e| e.to_string())?;
+    #[cfg(unix)]
     let wfd = pw.as_raw_fd();
 
     let stop = Arc::new(AtomicBool::new(false));
@@ -733,11 +737,11 @@ fn spawn(
         _ => None,
     };
 
-    let mut cmd = Command::new("ffmpeg");
+    let mut cmd = crate::platform::command("ffmpeg");
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
     let input = |cmd: &mut Command, url: &str, ua: &str, seek: bool| {
         // network-only options would be rejected for local files (offline playback)
-        if !url.starts_with('/') {
+        if !crate::platform::is_local_path(&url) {
             cmd.args(["-user_agent", ua]);
             cmd.args(["-probesize", "1500000", "-analyzeduration", "1000000"]);
             cmd.args(["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "5"]);
@@ -753,8 +757,9 @@ fn spawn(
     // Filters such as volume levelling hold back seconds of sound before they output any.
     // In one process that starves the sound while the picture waits for the clock (a
     // deadlock), so filtered sound always gets its own process.
-    let split = !audio_only && (aurl.is_some() || !afx.is_empty());
-    let mut acmd = Command::new("ffmpeg");
+    // Without file descriptor passing (Windows) the sound always comes from its own process.
+    let split = !audio_only && (aurl.is_some() || !afx.is_empty() || !cfg!(unix));
+    let mut acmd = crate::platform::command("ffmpeg");
     let audio_map = if split {
         acmd.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
         match &aurl {
@@ -795,10 +800,13 @@ fn spawn(
         }
         target.args(["-f", "f32le", "-ar"]);
         target.arg(rate.to_string());
-        target.args(["-ac", "2", if split { "pipe:1" } else { "pipe:3" }]);
+        // fd 3 where it exists; otherwise the process's own stdout (a separate audio process,
+        // or an audio-only decode that has no picture to put there)
+        target.args(["-ac", "2", if split || !cfg!(unix) { "pipe:1" } else { "pipe:3" }]);
     }
     cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     acmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(unix)]
     unsafe {
         cmd.pre_exec(move || {
             if wfd == 3 {
@@ -832,6 +840,7 @@ fn spawn(
 
     // video
     let mut stdout = child.stdout.take().unwrap();
+    let mut audio_stdout: Option<std::process::ChildStdout> = None;
     let (e2, s2) = (ended.clone(), stop.clone());
     if !audio_only {
     std::thread::spawn(move || {
@@ -851,8 +860,12 @@ fn spawn(
         }
         e2.store(true, Ordering::SeqCst);
     });
-    } else {
+    } else if cfg!(unix) {
         drop((e2, s2, tx, stdout));
+    } else {
+        // audio-only without fd 3: the sound is on stdout
+        drop((e2, s2, tx));
+        audio_stdout = Some(stdout);
     }
 
     // audio
@@ -860,7 +873,10 @@ fn spawn(
     let audio_end = ended.clone();
     let mut pr: Box<dyn Read + Send> = match child2.as_mut().and_then(|c| c.stdout.take()) {
         Some(out) => Box::new(out),
-        None => Box::new(pr),
+        None => match audio_stdout {
+            Some(out) => Box::new(out),
+            None => Box::new(pr),
+        },
     };
     if let Some(mut e) = child2.as_mut().and_then(|c| c.stderr.take()) {
         std::thread::spawn(move || {

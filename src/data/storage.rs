@@ -287,18 +287,7 @@ pub(crate) fn dir_size(p: &std::path::Path) -> u64 {
 
 /// Free bytes on the disk holding `p` (0 when unknown).
 pub(crate) fn free_space(p: &std::path::Path) -> u64 {
-    use std::os::unix::ffi::OsStrExt;
-    let mut path = p.to_path_buf();
-    while !path.exists() && path.pop() {}
-    let Ok(c) = std::ffi::CString::new(path.as_os_str().as_bytes()) else { return 0 };
-    unsafe {
-        let mut st: libc::statvfs = std::mem::zeroed();
-        if libc::statvfs(c.as_ptr(), &mut st) == 0 {
-            st.f_bavail as u64 * st.f_frsize as u64
-        } else {
-            0
-        }
-    }
+    crate::platform::free_space(p)
 }
 
 /// Measures downloads, clips and caches for the Storage section of the settings.

@@ -11,8 +11,8 @@ pub(crate) fn img_uri(ctx: &egui::Context, url: &str) -> String {
     static READY: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
     /// Images being fetched right now.
     static PENDING: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
-    if url.starts_with('/') {
-        return format!("file://{url}");
+    if crate::platform::is_local_path(&url) {
+        return crate::platform::file_uri(url);
     }
     if url.is_empty() {
         return String::new();
@@ -28,7 +28,7 @@ pub(crate) fn img_uri(ctx: &egui::Context, url: &str) -> String {
     for ext in ["jpg", "png", "webp"] {
         let path = dir.join("img").join(format!("{key}.{ext}"));
         if path.exists() {
-            let uri = format!("file://{}", path.display());
+            let uri = crate::platform::file_uri(&path.display().to_string());
             ready.lock().unwrap().insert(url.to_string(), uri.clone());
             return uri;
         }
@@ -54,7 +54,7 @@ pub(crate) fn img_uri(ctx: &egui::Context, url: &str) -> String {
                 let path = dir.join("img").join(format!("{key}.{ext}"));
                 let tmp = dir.join("img").join(format!("{key}.part"));
                 if std::fs::write(&tmp, bytes).is_ok() && std::fs::rename(&tmp, &path).is_ok() {
-                    let uri = format!("file://{}", path.display());
+                    let uri = crate::platform::file_uri(&path.display().to_string());
                     READY.get().unwrap().lock().unwrap().insert(url.clone(), uri);
                 }
             }

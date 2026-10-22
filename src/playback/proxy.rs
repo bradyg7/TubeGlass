@@ -216,7 +216,7 @@ mod seek_timing {
         println!("SEEK {}p duration {:.0}s", opt.height, st.duration);
         for pos in [0.0f64, 120.0, 400.0, 700.0] {
             let t = Instant::now();
-            let mut c = Command::new("ffmpeg");
+            let mut c = crate::platform::command("ffmpeg");
             c.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-probesize", "1500000", "-analyzeduration", "1000000"]);
             if pos > 0.5 { c.args(["-ss", &pos.to_string()]); }
             c.args(["-i", &v]);
@@ -240,7 +240,7 @@ mod seek_timing {
             let v = serve(&opt.url, &opt.ua, stop.clone()).unwrap();
             let (w, hh) = ((opt.width & !1) as usize, (opt.height & !1) as usize);
             let t = Instant::now();
-            let out = Command::new("ffmpeg")
+            let out = crate::platform::command("ffmpeg")
                 .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-ss", "400", "-i", &v, "-t", "10",
                     "-vf", &format!("fps=30,scale={w}:{hh}:flags=fast_bilinear,format=rgba"), "-an", "-f", "null", "-"])
                 .output()
@@ -272,7 +272,7 @@ mod seek_timing {
                 let v = serve(&opt.url, &opt.ua, stop.clone()).unwrap();
                 let au = serve(&a.url, &a.ua, stop.clone()).unwrap();
                 let t = Instant::now();
-                let mut c = Command::new("ffmpeg");
+                let mut c = crate::platform::command("ffmpeg");
                 c.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
                 c.args(&flags);
                 c.args(["-ss", &pos.to_string(), "-i", &v]);
@@ -296,7 +296,7 @@ mod seek_timing {
         let stop = Arc::new(AtomicBool::new(false));
         let flags = ["-probesize", "1500000", "-analyzeduration", "1000000"];
         let one = |url: String, pos: f64, map: &[&str]| {
-            let mut c = Command::new("ffmpeg");
+            let mut c = crate::platform::command("ffmpeg");
             c.args(["-hide_banner", "-loglevel", "error", "-nostdin"]).args(flags);
             c.args(["-ss", &pos.to_string(), "-i", &url]).args(map).args(["-f", "null", "-"]);
             c
@@ -307,7 +307,7 @@ mod seek_timing {
             let au = serve(&a.url, &a.ua, stop.clone()).unwrap();
             // sequential: one process, two inputs
             let t = Instant::now();
-            let mut c = Command::new("ffmpeg");
+            let mut c = crate::platform::command("ffmpeg");
             c.args(["-hide_banner", "-loglevel", "error", "-nostdin"]).args(flags);
             c.args(["-ss", &pos.to_string(), "-i", &v]).args(flags);
             c.args(["-ss", &pos.to_string(), "-i", &au]);
@@ -349,7 +349,7 @@ mod failure_tests {
         let stop = Arc::new(AtomicBool::new(false));
         let url = format!("http://127.0.0.1:{port}/v?clen=100000");
         let local = serve(&url, "t", stop.clone()).unwrap();
-        let out = Command::new("ffmpeg").args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i", &local, "-f", "null", "-"]).output().unwrap();
+        let out = crate::platform::command("ffmpeg").args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i", &local, "-f", "null", "-"]).output().unwrap();
         assert!(!out.status.success());
         assert!(last_error().contains("403"), "got: {}", last_error());
         stop.store(true, Ordering::SeqCst);
@@ -362,7 +362,7 @@ mod failure_tests {
         let v = st.video.iter().max_by_key(|v| v.height).unwrap();
         let stop = Arc::new(AtomicBool::new(false));
         let local = serve(&v.url, &v.ua, stop.clone()).unwrap();
-        let out = Command::new("ffmpeg").args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i", &local, "-frames:v", "5", "-f", "null", "-"]).output().unwrap();
+        let out = crate::platform::command("ffmpeg").args(["-hide_banner", "-loglevel", "error", "-nostdin", "-i", &local, "-frames:v", "5", "-f", "null", "-"]).output().unwrap();
         println!("alt: {}p muxed={} ok={}", v.height, v.muxed, out.status.success());
         assert!(out.status.success());
         stop.store(true, Ordering::SeqCst);

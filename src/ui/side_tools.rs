@@ -506,7 +506,7 @@ impl App {
                     play_here = true;
                 }
                 if ui.button("Show folder").clicked() {
-                    let _ = std::process::Command::new("xdg-open").arg(clip::dir()).spawn();
+                    crate::platform::open_path(&clip::dir());
                 }
             });
             if play_here {
@@ -613,7 +613,7 @@ impl App {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Open folder").clicked() {
                     let _ = std::fs::create_dir_all(clip::dir());
-                    let _ = std::process::Command::new("xdg-open").arg(clip::dir()).spawn();
+                    crate::platform::open_path(&clip::dir());
                 }
                 self.view_toggle(ui);
             });

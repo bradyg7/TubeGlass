@@ -80,9 +80,9 @@ pub fn run(
 
     let stop = Arc::new(AtomicBool::new(false));
     let open = |url: &str, ua: &str, hls: bool| -> Result<String, String> {
-        if hls || url.starts_with('/') { Ok(url.to_string()) } else { crate::proxy::serve(url, ua, stop.clone()) }
+        if hls || crate::platform::is_local_path(&url) { Ok(url.to_string()) } else { crate::proxy::serve(url, ua, stop.clone()) }
     };
-    let local = opt.url.starts_with('/');
+    let local = crate::platform::is_local_path(&opt.url);
     // where the picture and the sound come from
     let vurl = open(&opt.url, &opt.ua, opt.hls)?;
     let aurl = match (&streams.audio, opt.muxed) {
@@ -95,10 +95,10 @@ pub fn run(
         _ => None,
     };
 
-    let mut cmd = Command::new("ffmpeg");
+    let mut cmd = crate::platform::command("ffmpeg");
     cmd.args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y"]);
     let input = |cmd: &mut Command, url: &str, ua: &str| {
-        if !url.starts_with('/') {
+        if !crate::platform::is_local_path(&url) {
             cmd.args(["-user_agent", ua]);
         }
         cmd.args(["-ss", &format!("{start:.3}"), "-i", url]);
@@ -142,7 +142,7 @@ pub fn run(
     cmd.arg(&out);
     cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = cmd.spawn().map_err(|e| format!("could not start ffmpeg ({e})"))?;
-    let pid = child.id() as i32;
+    let pid = child.id();
     // a watcher so Cancel works even while ffmpeg is still opening the stream
     let finished = Arc::new(AtomicBool::new(false));
     let cancelled = Arc::new(AtomicBool::new(false));
@@ -152,7 +152,7 @@ pub fn run(
             while !fin.load(Ordering::Relaxed) {
                 if flag.load(Ordering::Relaxed) {
                     can.store(true, Ordering::SeqCst);
-                    unsafe { libc::kill(pid, libc::SIGKILL) };
+                    crate::platform::kill_process(pid);
                     break;
                 }
                 std::thread::sleep(std::time::Duration::from_millis(80));

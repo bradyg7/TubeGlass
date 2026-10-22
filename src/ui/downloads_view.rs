@@ -40,7 +40,7 @@ impl App {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center).with_main_wrap(true), |ui| {
                 if ui.add(egui::Button::new("Open folder")).clicked() {
                     let _ = std::fs::create_dir_all(download::dir());
-                    let _ = std::process::Command::new("xdg-open").arg(download::dir()).spawn();
+                    crate::platform::open_path(&download::dir());
                 }
                 if !self.library.is_empty() {
                     if self.dl_sel.is_some() {
@@ -255,7 +255,7 @@ impl App {
                                 Row::Item(d, _) => {
                                     let resp = ui.interact(rect, ui.scope_id().with(("dlcard", &d.file)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
                                     let hv = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
-                                    let uri = if std::path::Path::new(&d.thumb).exists() { format!("file://{}", d.thumb) } else { String::new() };
+                                    let uri = if std::path::Path::new(&d.thumb).exists() { crate::platform::file_uri(&d.thumb) } else { String::new() };
                                     let size = std::fs::metadata(&d.file).map(|x| x.len()).unwrap_or(0) as f64 / 1_048_576.0;
                                     let sub = if d.audio_only {
                                         format!("{}  •  audio  •  {:.0} MB", d.channel, size)
@@ -302,7 +302,7 @@ impl App {
                                 Row::GroupCard(name, members) => {
                                     let resp = ui.interact(rect, ui.scope_id().with(("dlgroup", name)), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
                                     let hv = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
-                                    let uri = members.iter().find(|x| std::path::Path::new(&x.thumb).exists()).map(|x| format!("file://{}", x.thumb)).unwrap_or_default();
+                                    let uri = members.iter().find(|x| std::path::Path::new(&x.thumb).exists()).map(|x| crate::platform::file_uri(&x.thumb)).unwrap_or_default();
                                     let mb: f64 = members.iter().map(|x| std::fs::metadata(&x.file).map(|f| f.len()).unwrap_or(0) as f64).sum::<f64>() / 1_048_576.0;
                                     let sub = format!("{} item{}  •  {:.0} MB", members.len(), if members.len() == 1 { "" } else { "s" }, mb);
                                     let img = views::media_card(ui, rect, m, &uri, name, &sub, hv);
@@ -416,7 +416,7 @@ impl App {
                 let th_r = Rect::from_min_size(rect.min + vec2(8.0, 6.0), vec2(120.0, 72.0));
                 ui.painter().rect_filled(th_r, CornerRadius::same(10), card_hi());
                 if std::path::Path::new(&d.thumb).exists() {
-                    egui::Image::new(format!("file://{}", d.thumb))
+                    egui::Image::new(crate::platform::file_uri(&d.thumb))
                         .fit_to_exact_size(th_r.size())
                         .corner_radius(CornerRadius::same(10))
                         .paint_at(ui, th_r);

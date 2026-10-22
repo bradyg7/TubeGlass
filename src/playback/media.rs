@@ -4,7 +4,6 @@
 use crate::yt::{Streams, VideoOpt};
 use serde_json::Value;
 use std::path::Path;
-use std::process::Command;
 
 /// File extensions the app offers in the Open dialog.
 pub const EXTENSIONS: &[&str] = &[
@@ -30,7 +29,13 @@ pub fn normalize_arg(arg: &str) -> String {
         out.push(bytes[i]);
         i += 1;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    let path = String::from_utf8_lossy(&out).into_owned();
+    // "file:///C:/x" leaves "/C:/x": drop the slash in front of a Windows drive letter
+    let b = path.as_bytes();
+    if cfg!(windows) && b.len() > 2 && b[0] == b'/' && b[2] == b':' {
+        return path[1..].to_string();
+    }
+    path
 }
 
 /// Returns (streams, title, artist).
@@ -38,7 +43,7 @@ pub fn probe(path: &str) -> Result<(Streams, String, String), String> {
     if !Path::new(path).is_file() {
         return Err("file not found".into());
     }
-    let out = Command::new("ffprobe")
+    let out = crate::platform::command("ffprobe")
         .args(["-v", "error", "-print_format", "json", "-show_format", "-show_streams", path])
         .output()
         .map_err(|e| format!("ffprobe is required ({e})"))?;
