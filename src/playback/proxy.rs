@@ -336,6 +336,11 @@ mod failure_tests {
     /// A server that answers every request with 403, like googlevideo does for a bad link.
     #[test]
     fn refused_stream_is_reported_not_cut_off() {
+        // the check feeds the proxy to ffmpeg, so it needs ffmpeg to be installed
+        if !crate::platform::ffmpeg_available() {
+            eprintln!("skipped: ffmpeg is not installed");
+            return;
+        }
         let l = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = l.local_addr().unwrap().port();
         std::thread::spawn(move || {

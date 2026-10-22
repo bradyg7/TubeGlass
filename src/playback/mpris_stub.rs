@@ -2,6 +2,8 @@
 //! same interface, so the rest of the app does not care. Media keys and the desktop's
 //! "now playing" widget are not wired up there; notifications use the system where possible.
 
+#![allow(dead_code)]
+
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex};
 
