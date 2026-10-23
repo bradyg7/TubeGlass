@@ -39,3 +39,16 @@ mod backup {
         assert!(restore_bundle(r#"{"app":"tubeglass","files":{"../../evil.json":{}}}"#).is_err());
     }
 }
+
+#[test]
+fn video_age_is_read_from_its_text() {
+    use crate::util::age_secs;
+    assert_eq!(age_secs("1.2M  •  3d ago"), 3 * 86_400);
+    assert_eq!(age_secs("N views  •  Streamed 2 months ago".replace('N', "5").as_str()), 2 * 2_592_000);
+    assert_eq!(age_secs("4K  •  12\u{a0}min ago"), 720);
+    assert_eq!(age_secs("9K  •  1 year ago"), 31_536_000);
+    assert_eq!(age_secs("2w ago"), 2 * 604_800);
+    assert!(age_secs("12 watching") == u64::MAX);
+    assert!(age_secs("2h ago") < age_secs("1d ago"));
+    assert!(age_secs("3w ago") < age_secs("1mo ago"));
+}

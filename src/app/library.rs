@@ -98,7 +98,8 @@ impl App {
                     Kind::Upcoming => 1,
                     Kind::Video => 2,
                 };
-                all.sort_by_key(|v| (k(v), v.rank));
+                // live first, then newest first (rank only breaks ties within the same age)
+                all.sort_by_key(|v| (k(v), if v.kind == Kind::Video { age_secs(&v.meta) } else { 0 }, v.rank));
                 all
             }
             Sel::History => self.history.iter().map(|h| h.video.clone()).collect(),
@@ -170,7 +171,8 @@ impl App {
                     Kind::Upcoming => 1,
                     Kind::Video => 2,
                 };
-                all.sort_by_key(|v| (k(v), v.rank));
+                // live first, then newest first (rank only breaks ties within the same age)
+                all.sort_by_key(|v| (k(v), if v.kind == Kind::Video { age_secs(&v.meta) } else { 0 }, v.rank));
                 all
             }
         };

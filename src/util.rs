@@ -27,6 +27,27 @@ pub(crate) fn ago(ts: u64) -> String {
     }
 }
 
+/// How old a video is, in seconds, from the text YouTube shows ("3d ago", "2 weeks ago",
+/// "Streamed 5mo ago", "12 min ago"). Videos with no such text count as the oldest.
+pub(crate) fn age_secs(meta: &str) -> u64 {
+    let Some(part) = meta.split('•').map(str::trim).find(|p| p.ends_with("ago")) else { return u64::MAX };
+    let part = part.trim_end_matches("ago").trim().trim_start_matches("Streamed").trim();
+    let digits: String = part.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let Ok(n) = digits.parse::<u64>() else { return u64::MAX };
+    let unit = part[digits.len()..].trim_matches(|c: char| c.is_whitespace() || c == '\u{a0}' || c == '\u{202f}');
+    let per = match unit {
+        u if u.starts_with("mo") => 2_592_000,
+        u if u.starts_with('m') => 60,
+        u if u.starts_with('s') => 1,
+        u if u.starts_with('h') => 3600,
+        u if u.starts_with('d') => 86_400,
+        u if u.starts_with('w') => 604_800,
+        u if u.starts_with('y') => 31_536_000,
+        _ => return u64::MAX,
+    };
+    n.saturating_mul(per)
+}
+
 /// Formats bytes as KB, MB or GB.
 pub(crate) fn fmt_size(b: u64) -> String {
     let b = b as f64;
