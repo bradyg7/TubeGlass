@@ -666,7 +666,10 @@ fn spawn_audio_only(streams: &Streams, rate: u32, stop: Arc<AtomicBool>, afx: &s
     let (url, ua) = match (&streams.audio, streams.video.iter().max_by_key(|v| v.height)) {
         (Some(a), _) => (proxy::serve(&a.url, &a.ua, stop)?, a.ua.clone()),
         (None, Some(v)) if crate::platform::is_local_path(&v.url) => (v.url.clone(), v.ua.clone()),
-        (None, Some(v)) if v.hls => (proxy::serve_hls(v.audio_url.as_deref().unwrap_or(&v.url), &v.ua, stop)?, v.ua.clone()),
+        (None, Some(v)) if v.hls => {
+            let u = v.audio_url.as_deref().unwrap_or(&v.url);
+            (if crate::platform::is_local_path(u) { u.to_string() } else { proxy::serve_hls(u, &v.ua, stop)? }, v.ua.clone())
+        }
         (None, Some(v)) => (proxy::serve(&v.url, &v.ua, stop)?, v.ua.clone()),
         _ => return Err("no stream".into()),
     };
@@ -718,7 +721,14 @@ fn spawn(
     let stop = Arc::new(AtomicBool::new(false));
     let seekable = !streams.is_live;
     let via_proxy = |url: &str, ua: &str, hls: bool| -> Result<String, String> {
-        if hls { proxy::serve_hls(url, ua, stop.clone()) } else { proxy::serve(url, ua, stop.clone()) }
+        if crate::platform::is_local_path(url) {
+            // a file on disk (downloads, clips, opened files) is read by ffmpeg directly
+            Ok(url.to_string())
+        } else if hls {
+            proxy::serve_hls(url, ua, stop.clone())
+        } else {
+            proxy::serve(url, ua, stop.clone())
+        }
     };
     let audio_only = force_audio || opt.height == 0;
     // Audio-only: read just the dedicated audio stream when there is one, so the video

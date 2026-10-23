@@ -566,3 +566,14 @@ mod hls_tests {
         assert_eq!(dec(&enc("https://a/b?c=d&e")), "https://a/b?c=d&e");
     }
 }
+
+#[cfg(test)]
+mod local_tests {
+    #[test]
+    fn files_on_disk_are_not_sent_through_the_network_proxy() {
+        // downloads, clips and opened files are marked like live streams so ffmpeg reads them
+        // directly; they must never be treated as an address to fetch
+        assert!(crate::platform::is_local_path("/home/a/Videos/x.mp4"));
+        assert!(!crate::platform::is_local_path("https://manifest.googlevideo.com/x.m3u8"));
+    }
+}
