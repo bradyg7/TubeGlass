@@ -236,13 +236,16 @@ impl App {
                 let full_h = inner.height() - 20.0;
                 let (hv, hm) = ((v.0 / max) as f32 * full_h, (v.1 / max) as f32 * full_h);
                 let base = inner.max.y - 20.0;
-                let bw = bar_w * 0.56;
-                let bx = x + (bar_w - bw) / 2.0;
-                if hv > 0.5 {
-                    ui.painter().rect_filled(Rect::from_min_max(Pos2::new(bx, base - hv), Pos2::new(bx + bw, base)), CornerRadius::same(4), accent());
-                }
-                if hm > 0.5 {
-                    ui.painter().rect_filled(Rect::from_min_max(Pos2::new(bx, base - hv - hm), Pos2::new(bx + bw, base - hv)), CornerRadius::same(4), TEAL);
+                // two thin bars side by side: video, then music
+                let bw = (bar_w * 0.2).clamp(3.0, 14.0);
+                let gap = 3.0;
+                let bx = x + (bar_w - (bw * 2.0 + gap)) / 2.0;
+                let round = CornerRadius { nw: 3, ne: 3, sw: 0, se: 0 };
+                for (n, (h, col)) in [(hv, accent()), (hm, TEAL)].into_iter().enumerate() {
+                    if h > 0.5 {
+                        let l = bx + n as f32 * (bw + gap);
+                        ui.painter().rect_filled(Rect::from_min_max(Pos2::new(l, base - h.max(2.0)), Pos2::new(l + bw, base)), round, col);
+                    }
                 }
                 let day = k.rsplit('-').next().unwrap_or("");
                 ui.painter().text(Pos2::new(x + bar_w / 2.0, inner.max.y - 8.0), Align2::CENTER_CENTER, day, FontId::proportional(11.0), muted());
