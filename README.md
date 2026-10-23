@@ -99,7 +99,7 @@ own round visualizer.
 - A **storage manager** shows what is used and frees space from finished or old downloads.
 
 ### Clips, local files and desktop
-- **Clips** — cut a range of any video to MP4, M4A or GIF, with a progress bar and *Cancel*. A clip
+- **Clips** — cut a range of any video to MP4, M4A or GIF, with a progress bar and *Cancel*. When the video has chapters, the Clip tab lists them: click one to select it, or press its *Clip* button to save it right away. A clip
   shows up on that video's seek bar, and the Clips page links back to the source.
 - **Local media** — open any audio or video file (`Ctrl+O`, drag and drop, or *Open with*) with the
   same player and visualizer.

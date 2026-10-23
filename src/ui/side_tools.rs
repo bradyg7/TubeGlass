@@ -338,6 +338,54 @@ impl App {
         ui.label(egui::RichText::new("Cut a piece out of this video and save it as a file.").size(13.5).color(muted()));
         ui.add_space(10.0);
 
+        // chapters: pick a segment instead of finding its start and end by hand
+        let chapters = self.player.streams.as_ref().map(|st| st.chapters.clone()).unwrap_or_default();
+        if !chapters.is_empty() {
+            ui.label(egui::RichText::new("SEGMENTS").size(11.0).color(muted()).strong());
+            ui.add_space(4.0);
+            let mut pick: Option<(f64, f64, bool)> = None;
+            egui::ScrollArea::vertical().id_salt("clip_segments").max_height(190.0).auto_shrink([false, true]).show(ui, |ui| {
+                for (i, c) in chapters.iter().enumerate() {
+                    let end = chapters.get(i + 1).map_or(dur, |n| n.start).min(dur);
+                    if end - c.start < 0.5 {
+                        continue;
+                    }
+                    let on = (self.clip.start - c.start).abs() < 0.6 && (self.clip.end - end).abs() < 0.6;
+                    let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::click());
+                    let resp = resp.on_hover_cursor(egui::CursorIcon::PointingHand);
+                    let bg = if on { accent().gamma_multiply(0.22) } else if resp.hovered() { ov(26) } else { ov(12) };
+                    ui.painter().rect_filled(r, CornerRadius::same(9), bg);
+                    if on {
+                        ui.painter().rect_stroke(r, CornerRadius::same(9), Stroke::new(1.5, accent()), StrokeKind::Inside);
+                    }
+                    let btn = Rect::from_center_size(Pos2::new(r.max.x - 34.0, r.center().y), vec2(60.0, 24.0));
+                    let bresp = ui.interact(btn, resp.id.with("save"), Sense::click()).on_hover_cursor(egui::CursorIcon::PointingHand);
+                    ui.painter().rect_filled(btn, CornerRadius::same(12), if bresp.hovered() { accent2() } else { accent() });
+                    ui.painter().text(btn.center(), Align2::CENTER_CENTER, "Clip", FontId::proportional(12.5), ON_ACCENT);
+                    let time = format!("{} – {}", fmt_time(c.start), fmt_time(end));
+                    ui.painter().text(Pos2::new(r.min.x + 10.0, r.center().y), Align2::LEFT_CENTER, &time, FontId::monospace(11.5), muted());
+                    let tx = r.min.x + 10.0 + 11.0 * time.chars().count() as f32 * 0.62 + 12.0;
+                    let title = truncate(ui, &c.title, FontId::proportional(13.5), (btn.min.x - tx - 8.0).max(40.0), 1);
+                    ui.painter().text(Pos2::new(tx, r.center().y), Align2::LEFT_CENTER, title, FontId::proportional(13.5), ink());
+                    if bresp.clicked() {
+                        pick = Some((c.start, end, true));
+                    } else if resp.clicked() {
+                        pick = Some((c.start, end, false));
+                    }
+                }
+            });
+            if let Some((a, b, save)) = pick {
+                self.clip.start = a;
+                self.clip.end = b;
+                self.clip.start_txt = fmt_time(a);
+                self.clip.end_txt = fmt_time(b);
+                if save && self.clip.busy.is_none() {
+                    self.start_clip();
+                }
+            }
+            ui.add_space(10.0);
+        }
+
         // range bar with two handles
         let (bar, _) = ui.allocate_exact_size(vec2(ui.available_width(), 34.0), Sense::hover());
         let (x0, x1) = (bar.min.x + 8.0, bar.max.x - 8.0);
