@@ -20,7 +20,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - id: run
-        run: cargo test --release -- --ignored
+        # one test at a time: they share a download folder and YouTube rate-limits parallel requests
+        run: |
+          cargo test --release -- --ignored --test-threads=1 || {
+            echo "first attempt failed, trying once more in a minute"
+            sleep 60
+            cargo test --release -- --ignored --test-threads=1
+          }
         continue-on-error: true
       - name: Open an issue when it broke
         if: steps.run.outcome == 'failure'

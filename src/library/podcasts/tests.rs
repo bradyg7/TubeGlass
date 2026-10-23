@@ -76,6 +76,10 @@ mod live {
     #[test]
     #[ignore = "network"]
     fn decode_speed() {
+        // a manual measurement, not a daily check
+        if std::env::var_os("TG_SURVEY").is_none() {
+            return;
+        }
         let ff = std::env::var("TUBEGLASS_FFMPEG").unwrap_or("ffmpeg".into());
         for q in ["joe rogan", "diary of a ceo", "techcrunch daily crunch", "dateline nbc", "darknet diaries", "bbc"] {
             let Ok(hits) = search(q) else { continue };
@@ -95,6 +99,10 @@ mod live {
     #[test]
     #[ignore = "network"]
     fn survey_many_shows() {
+        // a manual survey of many shows, not a daily check
+        if std::env::var_os("TG_SURVEY").is_none() {
+            return;
+        }
         for q in ["news", "true crime", "comedy", "history", "science", "business", "sports", "technology", "bbc", "npr", "joe rogan", "kenya", "swahili", "sermon", "meditation"] {
             let Ok(hits) = search(q) else { println!("SEARCH FAIL {q}"); continue };
             for h in hits.iter().take(4) {

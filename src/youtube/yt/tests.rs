@@ -164,47 +164,6 @@ mod tests {
 
     /// Prints how a named live stream would be opened (debugging aid: TG_LIVE_TITLE=nbc).
     #[test]
-    #[ignore = "needs network"]
-    fn live_one_debug() {
-        let want = std::env::var("TG_LIVE_TITLE").unwrap_or_else(|_| "NBC News".into()).to_lowercase();
-        let live = live_now().expect("live list");
-        let v = live.iter().find(|v| v.title.to_lowercase().contains(&want)).expect("no such live stream");
-        println!("ID {} {}", v.id, v.title);
-        match streams(&v.id) {
-            Ok(s) => {
-                for o in &s.video {
-                    println!("OPT {}p hls={} muxed={} ua={} url={} audio_url={:?}", o.height, o.hls, o.muxed, o.ua, o.url, o.audio_url);
-                }
-            }
-            Err(e) => println!("ERR {e}"),
-        }
-        match streams_alt(&v.id) {
-            Ok(_) => println!("ALT ok"),
-            Err(e) => println!("ALT ERR {e}"),
-        }
-    }
-
-    #[test]
-    #[ignore = "needs network"]
-    fn live_manifest_debug() {
-        let (resp, _) = visionos_response("awQzjn72bI0").unwrap();
-        let h = resp["streamingData"]["hlsManifestUrl"].as_str().map(String::from);
-        println!("MAN visionos hls: {}", h.is_some());
-        let url = match h {
-            Some(u) => u,
-            None => {
-                let vd = visitor_data().unwrap_or_default();
-                let r = player_response("awQzjn72bI0", &clients()[0], &vd).unwrap();
-                r["streamingData"]["hlsManifestUrl"].as_str().unwrap_or("").to_string()
-            }
-        };
-        let m = get_text(&url).unwrap();
-        for l in m.lines().filter(|l| l.starts_with("#EXT-X-MEDIA") || l.starts_with("#EXT-X-STREAM-INF")).take(8) {
-            println!("MAN {}", &l[..l.len().min(200)]);
-        }
-    }
-
-    #[test]
     fn dubbed_tracks_never_beat_the_original() {
         let mk = |track: &str, original: bool, br: u64| Cand {
             url: String::new(), ua: String::new(), mime: "audio/mp4; codecs=\"mp4a.40.2\"".into(),
