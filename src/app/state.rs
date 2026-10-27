@@ -133,6 +133,14 @@ pub(crate) struct App {
     pub(crate) panics: u8,
     pub(crate) lists: Vec<LocalList>,
     pub(crate) new_list: Option<(String, Option<Video>)>,
+    /// The "Import from YouTube" dialog: the pasted links, and how many playlists are still loading.
+    pub(crate) import_list: Option<(String, usize)>,
+    /// Sort order, date range and length limit chosen above a channel's or playlist's videos.
+    pub(crate) list_sort: u8,
+    pub(crate) list_date: u8,
+    pub(crate) list_len: u8,
+    /// True after the first press of a channel's Unsubscribe button.
+    pub(crate) confirm_unsub: bool,
     pub(crate) jobs: Vec<DlJob>,
     pub(crate) library: Vec<DlItem>,
     pub(crate) dl_err: Option<String>,

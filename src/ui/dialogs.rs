@@ -166,3 +166,70 @@ impl App {
         }
     }
 }
+
+impl App {
+    /// The "Import from YouTube" pop-up: paste playlist links, get editable local playlists.
+    pub(crate) fn import_list_dialog(&mut self, ctx: &egui::Context) {
+        let Some((text, loading)) = self.import_list.as_mut() else { return };
+        let mut go = false;
+        let mut cancel = false;
+        let ids = playlist_ids(text);
+        let busy = *loading > 0;
+        egui::Window::new("Import playlists from YouTube")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
+            .show(ctx, |ui| {
+                ui.set_width(420.0);
+                ui.label(egui::RichText::new("Paste one or more playlist links (or ids). Each becomes a playlist you can edit, download and keep offline.").size(12.5).color(muted()));
+                ui.add_space(6.0);
+                let f = text_field(ui, text, "https://www.youtube.com/playlist?list=…", 420.0, 42.0, "list", None, false);
+                if !busy {
+                    f.resp.request_focus();
+                }
+                if f.submit && !ids.is_empty() && !busy {
+                    go = true;
+                }
+                ui.add_space(4.0);
+                let note = if busy {
+                    format!("Importing… {loading} left")
+                } else if text.trim().is_empty() {
+                    String::new()
+                } else if ids.is_empty() {
+                    "No playlist link found yet. Private playlists cannot be imported.".to_string()
+                } else {
+                    format!("{} playlist{} found", ids.len(), if ids.len() == 1 { "" } else { "s" })
+                };
+                ui.label(egui::RichText::new(note).size(12.0).color(muted()));
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    let b = egui::Button::new(egui::RichText::new("Import").strong()).fill(accent());
+                    if ui.add_enabled(!ids.is_empty() && !busy, b).clicked() {
+                        go = true;
+                    }
+                    if ui.button(if busy { "Close" } else { "Cancel" }).clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            cancel = true;
+        }
+        if go {
+            if let Some((_, loading)) = self.import_list.as_mut() {
+                *loading = ids.len();
+            }
+            for id in ids {
+                let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
+                std::thread::spawn(move || {
+                    let r = yt::playlist_videos(&id);
+                    let _ = tx.send(Msg::ListImported(id, r));
+                    ctx.request_repaint();
+                });
+            }
+        }
+        if cancel {
+            self.import_list = None;
+        }
+    }
+}

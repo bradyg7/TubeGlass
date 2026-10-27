@@ -65,6 +65,7 @@ impl App {
             let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape))
                 && !ctx.egui_wants_keyboard_input()
                 && self.new_list.is_none()
+                && self.import_list.is_none()
                 && !self.show_help
                 && (self.watching.is_none() || self.pip);
             if (back_pressed || esc) && self.can_go_back() {
@@ -223,6 +224,7 @@ impl App {
             });
 
         self.new_list_dialog(ctx);
+        self.import_list_dialog(ctx);
         self.new_group_dialog(ctx);
         self.overlays(ctx);
 

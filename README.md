@@ -51,6 +51,8 @@ YouTube's public pages and internal endpoints, so there is no API key to registe
 ### Watching
 - **Channels** — add one by `@handle`, link or id. Each channel page has Videos, Live, Shorts,
   Playlists and About tabs with infinite scroll and a search box that searches inside the channel.
+  A channel can be unsubscribed from right on its page, and its videos (like any playlist) can be
+  sorted by date, views, length or title and narrowed by date range and length.
 - **A feed that is already there** — everything is cached on disk, so the app opens with content;
   *Refresh* fetches what is new. New videos get a **NEW** badge. Live streams and upcoming
   premieres are marked.
@@ -58,7 +60,8 @@ YouTube's public pages and internal endpoints, so there is no API key to registe
 - **Search** — videos, channels and playlists, with suggestions, recent searches and sort / date /
   length filters. Paste a video or playlist link and it opens directly.
 - **History with resume** — every video remembers where you stopped; *Watch later* and your own
-  playlists are kept locally.
+  playlists are kept locally. **Import playlists from YouTube** by pasting their links (the download
+  arrow next to *Playlists* in the sidebar); public and unlisted playlists work, private ones do not.
 - **Subscriptions import / export** — NewPipe JSON, YouTube Takeout CSV, OPML or a plain list of links.
 - **"For you" ordering** *(optional)* — Home can rank videos by what you actually watch; right-click
   a video for *Not interested* or *Recommend less from this channel*.

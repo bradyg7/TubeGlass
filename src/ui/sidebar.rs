@@ -194,6 +194,7 @@ impl App {
         }
         ui.add_space(4.0);
         let mut new_playlist = false;
+        let mut import_playlists = false;
         let mut new_group_clicked = false;
         let mut delete_group: Option<String> = None;
         let mut group_toggle: Option<(String, String)> = None;
@@ -215,6 +216,14 @@ impl App {
                         ui.painter().rect_filled(r, CornerRadius::same(8), ov((10.0 + 25.0 * hv) as u8));
                         icons::draw(ui.painter(), r.center(), "plus", 13.0, if hv > 0.5 { ink() } else { icons::muted_icon() });
                         new_playlist |= resp.clicked();
+                        let (r, resp) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::click());
+                        let resp = resp
+                            .on_hover_cursor(egui::CursorIcon::PointingHand)
+                            .on_hover_text("Import playlists from YouTube");
+                        let hv = ui.ctx().animate_bool_with_time(resp.id, resp.hovered(), 0.12);
+                        ui.painter().rect_filled(r, CornerRadius::same(8), ov((10.0 + 25.0 * hv) as u8));
+                        icons::draw(ui.painter(), r.center(), "download", 13.0, if hv > 0.5 { ink() } else { icons::muted_icon() });
+                        import_playlists |= resp.clicked();
                     });
                 });
             }
@@ -367,6 +376,9 @@ impl App {
         }
         if new_playlist {
             self.new_list = Some((String::new(), None));
+        }
+        if import_playlists {
+            self.import_list = Some((String::new(), 0));
         }
         if new_group_clicked {
             self.new_group = Some((String::new(), None));

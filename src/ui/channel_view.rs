@@ -43,6 +43,18 @@ impl App {
                     app.play_all_visible(false);
                 }
             }
+            // the first press asks, the second one unsubscribes
+            let sure = app.confirm_unsub;
+            let label = if sure { "Confirm unsubscribe" } else { "Unsubscribe" };
+            if icon_btn(ui, "", label, if sure { Some(LIVE) } else { None }, if sure { Color32::WHITE } else { ink() }, false, true).clicked() {
+                if sure {
+                    app.confirm_unsub = false;
+                    app.remove_channel(&ch.id);
+                    app.toast(format!("Unsubscribed from {}", ch.name));
+                } else {
+                    app.confirm_unsub = true;
+                }
+            }
             if let Some(ts) = app.fcache.updated.get(&ch.id) {
                 ui.label(egui::RichText::new(format!("updated {}", ago(*ts))).size(13.0).color(muted()));
             }

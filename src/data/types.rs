@@ -190,6 +190,8 @@ pub(crate) enum Msg {
     SearchPlaylists(String, Result<Vec<PlaylistHit>, String>),
     Suggestions(String, Vec<String>),
     Playlist(String, Result<(String, Vec<Video>), String>),
+    /// A playlist imported from a pasted link: its address and the title and videos found.
+    ListImported(String, Result<(String, Vec<Video>), String>),
     Live(Result<Vec<Video>, String>),
     ChanTab(String, String, Result<(ChannelHeader, TabData, Option<String>), String>),
     ChanMore(String, String, Result<(TabData, Option<String>), String>),

@@ -60,11 +60,48 @@ impl App {
                 v.sort_by(|a, b| self.recommend_score(b).total_cmp(&self.recommend_score(a)));
             }
         }
+        if self.has_list_tools() {
+            self.sort_and_filter(&mut v);
+        }
         let needle = fold(self.lib_filter.trim());
         if !needle.is_empty() && matches!(self.sel, Sel::History | Sel::Local(_)) {
             v.retain(|x| fold(&x.title).contains(&needle) || fold(&x.channel_name).contains(&needle));
         }
         v
+    }
+
+    /// True on pages that offer the sort / date / length chips: a channel's videos, and playlists.
+    pub(crate) fn has_list_tools(&self) -> bool {
+        match &self.sel {
+            Sel::Channel(_) => matches!(self.chan_tab, ChanTab::Videos | ChanTab::Live | ChanTab::Shorts),
+            Sel::Playlist(_) | Sel::Local(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Applies the chosen date range, length limit and sort order.
+    fn sort_and_filter(&self, v: &mut Vec<Video>) {
+        const DAY: u64 = 86_400;
+        let max_age = [u64::MAX, DAY, 7 * DAY, 30 * DAY, 365 * DAY][self.list_date as usize % 5];
+        let (min_len, max_len) = [(0, u64::MAX), (0, 240), (240, 1200), (1200, u64::MAX)][self.list_len as usize % 4];
+        v.retain(|x| {
+            let len = duration_secs(&x.duration);
+            let len_ok = self.list_len == 0 || len == 0 || (len >= min_len && len < max_len);
+            // a video without a readable age (a live stream, a title only) stays when no range is set
+            let date_ok = self.list_date == 0 || age_secs(&x.meta) <= max_age;
+            len_ok && date_ok
+        });
+        let by_views = |x: &Video| view_count(&x.meta).unwrap_or(0);
+        match self.list_sort {
+            1 => v.sort_by_key(|x| age_secs(&x.meta)),
+            2 => v.sort_by_key(|x| std::cmp::Reverse(age_secs(&x.meta))),
+            3 => v.sort_by_key(|x| std::cmp::Reverse(by_views(x))),
+            4 => v.sort_by_key(|x| by_views(x)),
+            5 => v.sort_by_key(|x| std::cmp::Reverse(duration_secs(&x.duration))),
+            6 => v.sort_by_key(|x| duration_secs(&x.duration)),
+            7 => v.sort_by_key(|x| fold(&x.title)),
+            _ => {}
+        }
     }
 
     /// Forget the list search when the page changes.
@@ -73,6 +110,10 @@ impl App {
         if k != self.lib_filter_page {
             self.lib_filter_page = k;
             self.lib_filter.clear();
+            self.list_sort = 0;
+            self.list_date = 0;
+            self.list_len = 0;
+            self.confirm_unsub = false;
         }
     }
 

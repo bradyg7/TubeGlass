@@ -52,3 +52,18 @@ fn video_age_is_read_from_its_text() {
     assert!(age_secs("2h ago") < age_secs("1d ago"));
     assert!(age_secs("3w ago") < age_secs("1mo ago"));
 }
+
+#[test]
+fn list_tools_read_their_inputs() {
+    use crate::util::{duration_secs, playlist_ids, view_count};
+    assert_eq!(view_count("Chill Music Lab  •  15K  •  2d ago"), Some(15_000));
+    assert_eq!(view_count("1.2M  •  3d ago"), Some(1_200_000));
+    assert_eq!(view_count("845 views  •  Streamed 2mo ago"), Some(845));
+    assert_eq!(view_count("1,234 views"), Some(1234));
+    assert_eq!(view_count("MrBeast  •  3d ago"), None);
+    assert_eq!(duration_secs("1:02:03"), 3723);
+    assert_eq!(duration_secs("4:05"), 245);
+    assert_eq!(duration_secs(""), 0);
+    let t = "https://www.youtube.com/playlist?list=PLabcdefghijklmnop&si=x https://youtu.be/x?list=PLzzzzzzzzzzzzzz, PLabcdefghijklmnop, hello";
+    assert_eq!(playlist_ids(t), vec!["PLabcdefghijklmnop".to_string(), "PLzzzzzzzzzzzzzz".to_string()]);
+}

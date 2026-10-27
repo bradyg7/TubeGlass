@@ -48,6 +48,54 @@ pub(crate) fn age_secs(meta: &str) -> u64 {
     n.saturating_mul(per)
 }
 
+/// The view count in a video's meta text ("1.2M  •  3d ago", "845 views  •  Streamed 2mo ago").
+pub(crate) fn view_count(meta: &str) -> Option<u64> {
+    for part in meta.split('•').map(str::trim) {
+        let p = part.trim_end_matches("views").trim_end_matches("view").trim();
+        if !p.starts_with(|c: char| c.is_ascii_digit()) {
+            continue;
+        }
+        let (num, mult) = match p.chars().last()? {
+            'K' | 'k' => (&p[..p.len() - 1], 1e3),
+            'M' | 'm' => (&p[..p.len() - 1], 1e6),
+            'B' | 'b' => (&p[..p.len() - 1], 1e9),
+            _ => (p, 1.0),
+        };
+        if let Ok(n) = num.replace(',', "").trim().parse::<f64>() {
+            return Some((n * mult) as u64);
+        }
+    }
+    None
+}
+
+/// Length of a video from its "1:02:03" style text (0 when unknown).
+pub(crate) fn duration_secs(text: &str) -> u64 {
+    let mut total = 0u64;
+    for part in text.trim().split(':') {
+        let Ok(n) = part.trim().parse::<u64>() else { return 0 };
+        total = total * 60 + n;
+    }
+    total
+}
+
+/// Playlist ids in pasted text: links with `list=…` or bare ids such as `PLxxxxxxxxxxxxxxxx`.
+pub(crate) fn playlist_ids(text: &str) -> Vec<String> {
+    let mut out: Vec<String> = vec![];
+    for tok in text.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
+        let id = match tok.split_once("list=") {
+            Some((_, r)) => r.split(['&', '#']).next().unwrap_or("").to_string(),
+            None => tok.to_string(),
+        };
+        let ok = id.len() >= 13
+            && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            && (tok.contains("list=") || ["PL", "OL", "UU", "FL", "LL", "RD"].iter().any(|p| id.starts_with(p)));
+        if ok && !out.contains(&id) {
+            out.push(id);
+        }
+    }
+    out
+}
+
 /// Formats bytes as KB, MB or GB.
 pub(crate) fn fmt_size(b: u64) -> String {
     let b = b as f64;

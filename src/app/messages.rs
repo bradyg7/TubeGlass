@@ -89,6 +89,36 @@ impl App {
                         self.playlist = Some((id, Some(r)));
                     }
                 }
+                Msg::ListImported(id, r) => {
+                    let mut left = 0;
+                    if let Some((_, n)) = self.import_list.as_mut() {
+                        *n = n.saturating_sub(1);
+                        left = *n;
+                    }
+                    match r {
+                        Ok((name, videos)) if !videos.is_empty() => {
+                            let n = videos.len();
+                            let single = self.import_list.as_ref().is_some_and(|(t, _)| playlist_ids(t).len() == 1);
+                            if single {
+                                self.save_playlist_locally(name, videos);
+                            } else {
+                                let mut name = name;
+                                if self.lists.iter().any(|l| l.name == name) {
+                                    name = format!("{name} (copy)");
+                                }
+                                let lid = format!("pl-{}-{}", now_secs(), self.lists.len());
+                                self.lists.push(LocalList { id: lid, name: name.clone(), videos, offline: false });
+                                save_lists(&self.lists);
+                                self.toast(format!("Imported “{name}” with {n} videos"));
+                            }
+                        }
+                        Ok(_) => self.toast("That playlist has no videos (or it is private)".to_string()),
+                        Err(e) => self.toast(format!("Could not import {id}: {e}")),
+                    }
+                    if left == 0 {
+                        self.import_list = None;
+                    }
+                }
                 Msg::ChanTab(id, tab, r) => {
                     let key = format!("{id}:{tab}");
                     self.tab_loading.remove(&key);

@@ -347,6 +347,54 @@ impl App {
         let shows_videos = !videos.is_empty()
             && !matches!(self.sel, Sel::Downloads | Sel::Settings | Sel::Music | Sel::MusicAlbum(_) | Sel::MusicArtist(_))
             && !(matches!(self.sel, Sel::Channel(_)) && self.chan_tab == ChanTab::About);
+        // sort and filter chips for a channel's videos and for playlists
+        if self.has_list_tools() && (shows_videos || self.list_sort != 0 || self.list_date != 0 || self.list_len != 0) {
+            let sorts = ["Default order", "Newest", "Oldest", "Most viewed", "Least viewed", "Longest", "Shortest", "Title A–Z"];
+            let dates = ["Any time", "Today", "This week", "This month", "This year"];
+            let lens = ["Any length", "Under 4 min", "4–20 min", "Over 20 min"];
+            ui.horizontal_wrapped(|ui| {
+                let chip = |ui: &mut egui::Ui, label: String, active: bool| -> egui::Response {
+                    icon_btn(ui, "", &label, Some(if active { accent() } else { card() }), if active { ON_ACCENT } else { ink() }, true, true)
+                };
+                let r1 = chip(ui, format!("Sort: {}", sorts[self.list_sort as usize % 8]), self.list_sort != 0);
+                egui::Popup::menu(&r1).show(|ui| {
+                    for (i, n) in sorts.iter().enumerate() {
+                        if ui.selectable_label(self.list_sort as usize == i, *n).clicked() {
+                            self.list_sort = i as u8;
+                            ui.close();
+                        }
+                    }
+                });
+                let r2 = chip(ui, dates[self.list_date as usize % 5].to_string(), self.list_date != 0);
+                egui::Popup::menu(&r2).show(|ui| {
+                    for (i, n) in dates.iter().enumerate() {
+                        if ui.selectable_label(self.list_date as usize == i, *n).clicked() {
+                            self.list_date = i as u8;
+                            ui.close();
+                        }
+                    }
+                });
+                let r3 = chip(ui, lens[self.list_len as usize % 4].to_string(), self.list_len != 0);
+                egui::Popup::menu(&r3).show(|ui| {
+                    for (i, n) in lens.iter().enumerate() {
+                        if ui.selectable_label(self.list_len as usize == i, *n).clicked() {
+                            self.list_len = i as u8;
+                            ui.close();
+                        }
+                    }
+                });
+                if (self.list_sort != 0 || self.list_date != 0 || self.list_len != 0) && icon_btn(ui, "", "Reset", None, muted(), false, true).clicked() {
+                    self.list_sort = 0;
+                    self.list_date = 0;
+                    self.list_len = 0;
+                }
+                if matches!(self.sel, Sel::Channel(_)) {
+                    ui.label(egui::RichText::new("applies to the videos loaded so far").size(12.0).color(muted()));
+                }
+            });
+            ui.add_space(4.0);
+        }
+
         if shows_videos {
             let mut mode = self.settings.view_mode;
             let mut for_you = self.settings.home_for_you;
