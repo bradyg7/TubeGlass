@@ -103,38 +103,11 @@ jobs:
           path: dist/*.zip
           if-no-files-found: error
 
-  macos:
-    name: macOS ${{ matrix.arch }}
-    needs: version
-    runs-on: macos-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        arch: [aarch64, x86_64]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.arch }}-apple-darwin
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.arch }}
-      - name: Build and package
-        shell: bash
-        run: ./packaging/build-macos.sh ${{ matrix.arch }} 2>&1 | tee build.log
-      - name: Show what failed
-        if: failure()
-        run: .github/scripts/annotate.sh "macOS ${{ matrix.arch }}" build.log
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.arch }}
-          path: dist/*.dmg
-          if-no-files-found: error
-
   publish:
     name: Publish the release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, macos]
+    # this fork skips the macOS packages: no macOS runner was available to it
+    needs: [linux, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
