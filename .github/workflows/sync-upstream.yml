@@ -1,0 +1,44 @@
+# Weekly: merges flawlesscode254/TubeGlass main into this fork's `custom` branch on a
+# `sync-upstream` branch and opens a pull request, so upstream fixes arrive for review.
+# A merge conflict opens an issue instead. Nothing reaches `custom` without a merge by hand.
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: custom
+          fetch-depth: 0
+      - name: Merge upstream main
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/flawlesscode254/TubeGlass.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream."
+            exit 0
+          fi
+          git checkout -B sync-upstream
+          if git merge --no-edit upstream/main; then
+            git push -f origin sync-upstream
+            gh pr view sync-upstream --json number >/dev/null 2>&1 || gh pr create --base custom --head sync-upstream --title "Merge upstream changes" --body "Upstream main has new commits. Check that the build and tests pass, raise the version in Cargo.toml above upstream's, merge, then tag a release."
+          else
+            git merge --abort
+            gh issue create --title "Upstream merge needs a hand" --body "Merging flawlesscode254/TubeGlass main into custom conflicts. Merge it locally: git fetch upstream; git merge upstream/main."
+          fi
