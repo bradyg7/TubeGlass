@@ -232,4 +232,73 @@ impl App {
             self.import_list = None;
         }
     }
+
+    /// The "Import from Spotify" pop-up: paste track links, get them as liked YouTube Music songs.
+    pub(crate) fn spotify_import_dialog(&mut self, ctx: &egui::Context) {
+        let Some((text, left, added, missed)) = self.spotify_import.as_mut() else { return };
+        let mut go = false;
+        let mut cancel = false;
+        let ids = spotify::track_ids(text);
+        let busy = *left > 0;
+        egui::Window::new("Import from Spotify")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
+            .show(ctx, |ui| {
+                ui.set_width(440.0);
+                ui.label(egui::RichText::new("In Spotify, open a list (Liked Songs or a playlist), click a song, press Ctrl+A then Ctrl+C, and paste here. Each song is found on YouTube Music and added to Liked songs.").size(12.5).color(muted()));
+                ui.add_space(6.0);
+                egui::ScrollArea::vertical().max_height(140.0).show(ui, |ui| {
+                    ui.add_enabled(!busy, egui::TextEdit::multiline(text).desired_width(430.0).desired_rows(5).hint_text("https://open.spotify.com/track/…"));
+                });
+                ui.add_space(4.0);
+                let note = if busy {
+                    format!("Finding songs… {left} left, {added} added")
+                } else if !missed.is_empty() {
+                    format!("Added {added}. No clear match for {}:", missed.len())
+                } else if text.trim().is_empty() {
+                    String::new()
+                } else if ids.is_empty() {
+                    "No Spotify song link found yet.".to_string()
+                } else {
+                    format!("{} song{} found", ids.len(), if ids.len() == 1 { "" } else { "s" })
+                };
+                ui.label(egui::RichText::new(note).size(12.0).color(muted()));
+                if !busy && !missed.is_empty() {
+                    egui::ScrollArea::vertical().id_salt("spotify_missed").max_height(120.0).show(ui, |ui| {
+                        for m in missed.iter() {
+                            ui.label(egui::RichText::new(format!("• {m}")).size(12.0));
+                        }
+                    });
+                    ui.label(egui::RichText::new("Search for these on the Music page and press the heart.").size(12.0).color(muted()));
+                }
+                ui.add_space(6.0);
+                ui.horizontal(|ui| {
+                    let b = egui::Button::new(egui::RichText::new("Import").strong()).fill(accent());
+                    if ui.add_enabled(!ids.is_empty() && !busy && missed.is_empty(), b).clicked() {
+                        go = true;
+                    }
+                    if ui.button(if busy || !missed.is_empty() { "Close" } else { "Cancel" }).clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            cancel = true;
+        }
+        if go {
+            *left = ids.len();
+            // one worker, in order, so the songs land in the same order as in Spotify
+            let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
+            std::thread::spawn(move || {
+                for id in ids {
+                    let _ = tx.send(Msg::SpotifyFound(spotify::find(&id)));
+                    ctx.request_repaint();
+                }
+            });
+        }
+        if cancel {
+            self.spotify_import = None;
+        }
+    }
 }

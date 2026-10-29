@@ -192,6 +192,8 @@ pub(crate) enum Msg {
     Playlist(String, Result<(String, Vec<Video>), String>),
     /// A playlist imported from a pasted link: its address and the title and videos found.
     ListImported(String, Result<(String, Vec<Video>), String>),
+    /// One pasted Spotify track: its YouTube Music song, or the track it could not match.
+    SpotifyFound(Result<Video, String>),
     Live(Result<Vec<Video>, String>),
     ChanTab(String, String, Result<(ChannelHeader, TabData, Option<String>), String>),
     ChanMore(String, String, Result<(TabData, Option<String>), String>),

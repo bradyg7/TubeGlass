@@ -142,6 +142,7 @@ impl App {
             lists: load_lists(),
             new_list: None,
             import_list: None,
+            spotify_import: None,
             list_sort: 0,
             list_date: 0,
             list_len: 0,

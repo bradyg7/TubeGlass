@@ -135,6 +135,9 @@ pub(crate) struct App {
     pub(crate) new_list: Option<(String, Option<Video>)>,
     /// The "Import from YouTube" dialog: the pasted links, and how many playlists are still loading.
     pub(crate) import_list: Option<(String, usize)>,
+    /// The "Import from Spotify" dialog: the pasted links, tracks still loading, songs added,
+    /// and the tracks that had no confident match.
+    pub(crate) spotify_import: Option<(String, usize, usize, Vec<String>)>,
     /// Sort order, date range and length limit chosen above a channel's or playlist's videos.
     pub(crate) list_sort: u8,
     pub(crate) list_date: u8,

@@ -7,3 +7,4 @@ pub mod podcasts;
 pub mod insights;
 pub mod update;
 pub mod ffmpeg_setup;
+pub mod spotify;

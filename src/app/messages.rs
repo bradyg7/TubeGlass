@@ -89,6 +89,38 @@ impl App {
                         self.playlist = Some((id, Some(r)));
                     }
                 }
+                Msg::SpotifyFound(r) => {
+                    let mut done = None;
+                    if let Some((_, left, added, missed)) = self.spotify_import.as_mut() {
+                        *left = left.saturating_sub(1);
+                        match r {
+                            Ok(v) => {
+                                if let Some(l) = self.lists.iter_mut().find(|l| l.id == "liked") {
+                                    if !l.videos.iter().any(|x| x.id == v.id) {
+                                        // keep the pasted order: each new song goes after the ones added before it
+                                        l.videos.insert((*added).min(l.videos.len()), v);
+                                        *added += 1;
+                                    }
+                                }
+                            }
+                            Err(e) => missed.push(e),
+                        }
+                        if *left == 0 {
+                            done = Some((*added, missed.len()));
+                        }
+                    }
+                    if let Some((added, missed)) = done {
+                        save_lists(&self.lists);
+                        self.toast(if missed == 0 {
+                            format!("Added {added} songs to Liked songs")
+                        } else {
+                            format!("Added {added} songs to Liked songs; {missed} had no clear match")
+                        });
+                        if missed == 0 {
+                            self.spotify_import = None;
+                        }
+                    }
+                }
                 Msg::ListImported(id, r) => {
                     let mut left = 0;
                     if let Some((_, n)) = self.import_list.as_mut() {

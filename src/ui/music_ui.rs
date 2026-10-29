@@ -499,8 +499,10 @@ impl App {
                             );
                             ui.add_space(10.0);
                         }
-                        for (title, cards) in &page.shelves {
-                            shelf(ui, title, cards, &mut open, &mut play);
+                        if self.settings.music_charts {
+                            for (title, cards) in &page.shelves {
+                                shelf(ui, title, cards, &mut open, &mut play);
+                            }
                         }
                     });
                 }

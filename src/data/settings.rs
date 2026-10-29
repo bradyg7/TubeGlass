@@ -61,6 +61,8 @@ pub(crate) struct Settings {
     pub(crate) view_mode: u8,
     /// rank the Home feed by what you watch instead of newest first
     pub(crate) home_for_you: bool,
+    /// show YouTube Music's own home, charts and new releases under your picks on the Music page
+    pub(crate) music_charts: bool,
     /// videos marked "not interested"
     pub(crate) hidden: HashSet<String>,
     pub(crate) download_dir: String,
@@ -101,6 +103,7 @@ impl Default for Settings {
             density: 1,
             view_mode: 0,
             home_for_you: false,
+            music_charts: false,
             hidden: HashSet::new(),
             download_dir: String::new(),
             speed: 1.0,

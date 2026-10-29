@@ -13,6 +13,7 @@ impl App {
         let mut clear_cache = false;
         let mut clear_history = false;
         let mut import_subs = false;
+        let mut import_spotify = false;
         let mut export_subs = false;
         let mut backup = false;
         let mut restore = false;
@@ -282,6 +283,16 @@ impl App {
                     }
                 });
             });
+            section(ui, "MUSIC", &mut |ui| {
+                row(ui, "Show YouTube Music charts", "Charts, new releases and YouTube Music's own picks under yours on the Music page", &mut |ui| {
+                    changed |= switch(ui, &mut self.settings.music_charts);
+                });
+                row(ui, "Import from Spotify", "Paste Spotify song links (Ctrl+A, Ctrl+C in a Spotify list) to add them to Liked songs", &mut |ui| {
+                    if ui.button("Import…").clicked() {
+                        import_spotify = true;
+                    }
+                });
+            });
             section(ui, "SUBSCRIPTIONS", &mut |ui| {
                 row(ui, "Import", "NewPipe export, YouTube Takeout CSV, OPML, or a list of links", &mut |ui| {
                     if ui.button("Import…").clicked() {
@@ -372,6 +383,9 @@ impl App {
                 let _ = tx.send(Msg::DirPicked(p.map(|p| p.display().to_string())));
                 ctx.request_repaint();
             });
+        }
+        if import_spotify {
+            self.spotify_import = Some((String::new(), 0, 0, vec![]));
         }
         if import_subs {
             let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
